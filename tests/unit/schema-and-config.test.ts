@@ -35,7 +35,7 @@ describe('database schema', () => {
 
   it('applies migrations idempotently and refuses a database from a newer build', () => {
     const sqlite = new Database(':memory:');
-    expect(applyMigrations(sqlite)).toEqual(['0001_initial']);
+    expect(applyMigrations(sqlite)).toEqual(['0001_initial', '0002_demo_content_flags']);
     expect(applyMigrations(sqlite)).toEqual([]);
     sqlite.prepare("INSERT INTO schema_migrations VALUES ('9999_future', 'x')").run();
     expect(() => applyMigrations(sqlite)).toThrow(/unknown to this build/);

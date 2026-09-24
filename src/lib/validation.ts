@@ -44,6 +44,21 @@ export const slugSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers and single hyphens.')
   .refine((slug) => !RESERVED_SLUGS.has(slug), 'This slug is reserved. Choose another.');
 
+/**
+ * A URL slug derived from a name, e.g. "Anti ESP" → "anti-esp". Returns an
+ * empty string when the name has no usable characters.
+ */
+export function slugFromName(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64)
+    .replace(/-+$/g, '');
+}
+
 export function requiredText(max: number, label = 'This field') {
   return z
     .string()

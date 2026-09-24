@@ -30,6 +30,8 @@ const supportExternal = Boolean(product.supportUrl || settings['links.discord'])
 const metaDescription =
   product.tagline || markdownToText(product.description) || `${product.name} by Based Productions.`;
 const latest = product.latestRelease;
+// Nothing has shipped yet, so there is nothing to support: invite questions instead.
+const unreleased = product.availability === 'in_development' && releases.length === 0;
 ---
 
 <SiteLayout title={product.name} description={metaDescription} image={product.artwork?.url}>
@@ -117,6 +119,16 @@ const latest = product.latestRelease;
               )}
             </dd>
           </div>
+          {product.minecraftVersions.length === 0 &&
+            product.platforms.length === 0 &&
+            !product.javaVersion && (
+              <div>
+                <dt>Compatibility</dt>
+                <dd>
+                  <span class="subtle">Not published yet</span>
+                </dd>
+              </div>
+            )}
           {product.minecraftVersions.length > 0 && (
             <div>
               <dt>Minecraft</dt>
@@ -256,9 +268,11 @@ const latest = product.latestRelease;
         )}
 
         <section class="support-box" aria-labelledby="help-title">
-          <h2 id="help-title">Need help with {product.name}?</h2>
+          <h2 id="help-title">
+            {unreleased ? `Questions about ${product.name}?` : `Need help with ${product.name}?`}
+          </h2>
           <p>
-            Support happens on our Discord server.
+            {unreleased ? 'Ask on our Discord server.' : 'Support happens on our Discord server.'}
             {docsHref && ' The documentation covers installation and configuration.'}
           </p>
           <div class="button-row">

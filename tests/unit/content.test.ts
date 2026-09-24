@@ -2,18 +2,31 @@ import { mkdtempSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { eq } from 'drizzle-orm';
+import Database from 'better-sqlite3';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Actor } from '../../src/server/auth/authorization.ts';
 import { resetConfigForTests } from '../../src/server/config.ts';
 import type { Db } from '../../src/server/db/client.ts';
-import { contentBlocks, products, settings as settingsTable } from '../../src/server/db/schema.ts';
+import { MIGRATIONS } from '../../src/server/db/migrations.ts';
+import {
+  contentBlocks,
+  media,
+  productMedia,
+  products,
+  settings as settingsTable,
+} from '../../src/server/db/schema.ts';
 import {
   createDocPage,
   getPublishedDocPage,
   listDocCollections,
 } from '../../src/server/services/docs.ts';
-import { deleteMedia, readMediaFile, uploadImage } from '../../src/server/services/media.ts';
+import {
+  deleteMedia,
+  listMedia,
+  readMediaFile,
+  uploadImage,
+} from '../../src/server/services/media.ts';
 import {
   createProduct,
   getPublishedProduct,
@@ -27,6 +40,7 @@ import {
   updateContent,
   updateSettings,
 } from '../../src/server/services/site.ts';
+import { createTeamMember } from '../../src/server/services/team.ts';
 import { CONTENT_BLOCKS } from '../../src/lib/site-registry.ts';
 import { ctx, freshDb, makeActor } from '../helpers/db.ts';
 
@@ -403,6 +417,24 @@ describe('media uploads', () => {
     expect(readdirSync(path.join(dataDir, 'uploads'))).toHaveLength(before);
   });
 
+  it('explains that an image over the pixel limit is too large', async () => {
+    const huge = await sharp({
+      create: { width: 12000, height: 12000, channels: 3, background: '#000000' },
+    })
+      .png()
+      .toBuffer();
+    const result = await uploadImage(
+      db,
+      ctx(actor),
+      new File([new Uint8Array(huge)], 'huge.png', { type: 'image/png' }),
+      '',
+    );
+    expect(result).toEqual({
+      ok: false,
+      errors: { file: 'This image is too large. Use at most 50 megapixels.' },
+    });
+  });
+
   it('refuses to delete an image that a product uses', async () => {
     const file = new File([new Uint8Array(await png())], 'art.png', { type: 'image/png' });
     const upload = await uploadImage(db, ctx(actor), file, 'Art');
@@ -410,5 +442,129 @@ describe('media uploads', () => {
     created(createProduct(db, ctx(actor), product({ artworkId: upload.value.id })));
     const result = await deleteMedia(db, ctx(actor), upload.value.id);
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('demo content isolation', () => {
+  // Regression: a real product (Anti ESP) could be given the Demo Warps
+  // artwork created by `npm run demo:seed`, and the public page showed it.
+  let db: Db;
+  let actor: Actor;
+  const at = '2026-01-01T00:00:00.000Z';
+  const demoImage = 'D'.repeat(22);
+  const ownImage = 'O'.repeat(22);
+
+  beforeEach(() => {
+    db = freshDb();
+    actor = makeActor(db, ['panel.access', 'products.manage', 'team.manage', 'media.manage']);
+    for (const [id, isDemo] of [
+      [demoImage, true],
+      [ownImage, false],
+    ] as const) {
+      db.insert(media)
+        .values({
+          id,
+          originalName: `${id}.webp`,
+          alt: '',
+          width: 1600,
+          height: 900,
+          bytes: 1,
+          createdAt: at,
+          isDemo,
+        })
+        .run();
+    }
+  });
+
+  it('does not let a real product use demo artwork or screenshots', () => {
+    const artwork = createProduct(db, ctx(actor), product({ artworkId: demoImage }));
+    expect(artwork).toMatchObject({
+      ok: false,
+      errors: { artworkId: expect.stringMatching(/demo/) },
+    });
+    const screens = createProduct(db, ctx(actor), product({ screenshotIds: [demoImage] }));
+    expect(screens).toMatchObject({
+      ok: false,
+      errors: { screenshotIds: expect.stringMatching(/demo/) },
+    });
+    const id = created(createProduct(db, ctx(actor), product({ artworkId: ownImage })));
+    expect(updateProduct(db, ctx(actor), id, product({ artworkId: demoImage })).ok).toBe(false);
+    expect(getPublishedProduct(db, 'test-plugin')?.artwork?.id).toBe(ownImage);
+  });
+
+  it('shows a real product without demo artwork it already points at', () => {
+    // Databases seeded before the demo flag existed may hold this state.
+    const id = created(createProduct(db, ctx(actor), product()));
+    db.update(products).set({ artworkId: demoImage }).where(eq(products.id, id)).run();
+    db.insert(productMedia).values({ productId: id, mediaId: demoImage, position: 0 }).run();
+    const page = getPublishedProduct(db, 'test-plugin');
+    expect(page?.artwork).toBeNull();
+    expect(page?.screenshots).toEqual([]);
+  });
+
+  it('keeps demo artwork on demo products', () => {
+    db.insert(products)
+      .values({
+        slug: 'demo-x',
+        name: 'Demo X',
+        artworkId: demoImage,
+        isDemo: true,
+        createdAt: at,
+        updatedAt: at,
+        visibility: 'published',
+      })
+      .run();
+    expect(getPublishedProduct(db, 'demo-x')?.artwork?.id).toBe(demoImage);
+  });
+
+  it('leaves demo images out of pickers for real content', () => {
+    expect(listMedia(db, actor, { includeDemo: false }).map((m) => m.id)).toEqual([ownImage]);
+    expect(
+      listMedia(db, actor)
+        .map((m) => m.id)
+        .sort(),
+    ).toEqual([demoImage, ownImage].sort());
+    const member = createTeamMember(db, ctx(actor), {
+      name: 'Real Person',
+      roleTitle: '',
+      bio: '',
+      avatarId: demoImage,
+      links: [],
+      sortOrder: 0,
+      visibility: 'published',
+    });
+    expect(member).toMatchObject({
+      ok: false,
+      errors: { avatarId: expect.stringMatching(/demo/) },
+    });
+  });
+
+  it('flags content seeded before the demo flag existed', () => {
+    const sqlite = new Database(':memory:');
+    sqlite.exec(MIGRATIONS[0]!.sql);
+    const insertMedia = sqlite.prepare(
+      "INSERT INTO media (id, original_name, alt, width, height, bytes, created_at) VALUES (?, ?, ?, 1, 1, 1, 'x')",
+    );
+    insertMedia.run('a', 'demo-demo-warps.webp', 'Demo artwork for Demo Warps');
+    insertMedia.run('b', 'demo-shot.webp', 'My own screenshot');
+    const insertProduct = sqlite.prepare(
+      "INSERT INTO products (slug, name, tagline, created_at, updated_at) VALUES (?, ?, ?, 'x', 'x')",
+    );
+    insertProduct.run(
+      'demo-warps',
+      'Demo Warps',
+      'Placeholder product used to preview layouts. Not a real Based Productions product.',
+    );
+    insertProduct.run('anti-esp', 'Anti ESP', '');
+    sqlite.exec(MIGRATIONS.find((m) => m.name === '0002_demo_content_flags')!.sql);
+    expect(sqlite.prepare('SELECT id, is_demo FROM media ORDER BY id').all()).toEqual([
+      { id: 'a', is_demo: 1 },
+      { id: 'b', is_demo: 0 },
+    ]);
+    expect(sqlite.prepare('SELECT slug, is_demo FROM products ORDER BY slug').all()).toEqual([
+      { slug: 'anti-esp', is_demo: 0 },
+      { slug: 'demo-warps', is_demo: 1 },
+    ]);
+    sqlite.close();
   });
 });

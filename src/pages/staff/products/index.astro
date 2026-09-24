@@ -43,6 +43,7 @@ const products = listProductsForStaff(getDb(), actor);
               <td class="data-table__primary">
                 <a href={`/staff/products/${product.id}`}>{product.name}</a>
                 <span class="data-table__secondary mono">/{product.slug}</span>
+                {product.isDemo && <span class="badge badge--muted">Demo content</span>}
               </td>
               <td>
                 <span

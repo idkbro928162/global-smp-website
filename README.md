@@ -78,6 +78,15 @@ npm run dev                     # http://localhost:4321
 “Demo …”, so layouts can be reviewed. It refuses to run in production (`NODE_ENV=production` or an
 `https` `SITE_URL`) or when products already exist. Delete `data/` to start again.
 
+Demo products and demo images are flagged in the database (`is_demo`). Demo images are not offered
+in the artwork, screenshot or team-photo pickers for real content, the server rejects them if they
+are submitted anyway, and a real product that already points at one (possible in databases seeded
+before the flag existed; migration `0002` flags those automatically) is shown with the neutral
+placeholder instead. The staff dashboard warns while demo content exists; delete it before launch.
+
+Draft copy for the first real product is in [`docs/content/anti-esp.md`](docs/content/anti-esp.md);
+the site does not read that file — paste it into the staff editor.
+
 ### Scripts
 
 | Command                           | What it does                                                                  |
@@ -376,6 +385,13 @@ project was built in; after upgrading it, run `npx playwright install chromium`.
 
 The app is a single long-running Node process with a persistent data directory. It is **not suited
 to serverless platforms** (SQLite needs a persistent disk).
+
+**Vercel:** Vercel Functions have a read-only deployment directory and only an ephemeral `/tmp`
+that is not shared between instances, so the database, sessions, audit log and uploads would be
+lost or diverge between instances. Deploying this app there unchanged is unsafe. Running on Vercel
+would need a hosted database (for example libSQL/Turso or Postgres), object storage for uploads
+(for example Vercel Blob) and the `@astrojs/vercel` adapter — an architecture change that has not
+been made.
 
 1. `npm ci && npm run build`
 2. Set `SITE_URL=https://basedproductions.xyz`, `DATA_DIR=/var/lib/based-productions` (persistent,

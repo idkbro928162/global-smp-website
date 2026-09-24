@@ -197,4 +197,20 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    // Marks records created by `npm run demo:seed` so demo images can never be
+    // attached to (or shown on) real products. Existing demo rows are
+    // recognised by the exact names and alt text the seed script has always
+    // used, so a database seeded before this migration is flagged too.
+    name: '0002_demo_content_flags',
+    sql: /* sql */ `
+      ALTER TABLE media ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0 CHECK (is_demo IN (0, 1));
+      ALTER TABLE products ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0 CHECK (is_demo IN (0, 1));
+      UPDATE media SET is_demo = 1
+        WHERE original_name LIKE 'demo-%.webp' AND alt LIKE 'Demo artwork for %';
+      UPDATE products SET is_demo = 1
+        WHERE name LIKE 'Demo %'
+          AND tagline = 'Placeholder product used to preview layouts. Not a real Based Productions product.';
+    `,
+  },
 ];

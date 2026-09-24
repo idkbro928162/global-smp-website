@@ -50,6 +50,8 @@ export interface MediaItem {
   createdAt: string;
   url: string;
   smallUrl: string;
+  /** Created by `npm run demo:seed`; only demo products may use it. */
+  isDemo: boolean;
 }
 
 export function mediaUrl(id: string, rendition: Rendition = 'lg'): string {
@@ -67,6 +69,7 @@ function toItem(row: typeof media.$inferSelect): MediaItem {
     createdAt: row.createdAt,
     url: mediaUrl(row.id, 'lg'),
     smallUrl: mediaUrl(row.id, 'sm'),
+    isDemo: row.isDemo,
   };
 }
 
@@ -85,10 +88,18 @@ export function getMediaItems(db: Db, ids: readonly string[]): Map<string, Media
   return new Map(rows.map((row) => [row.id, toItem(row)]));
 }
 
-/** Media listing for pickers and the media library. */
-export function listMedia(db: Db, actor: MutationContext['actor']): MediaItem[] {
+/**
+ * Media listing for pickers and the media library. Pickers for real content
+ * pass `includeDemo: false` so demo-seed images cannot be chosen by mistake.
+ */
+export function listMedia(
+  db: Db,
+  actor: MutationContext['actor'],
+  { includeDemo = true }: { includeDemo?: boolean } = {},
+): MediaItem[] {
   assertCanAny(actor, ['media.manage', 'products.manage', 'team.manage', 'docs.manage']);
-  return db.select().from(media).orderBy(desc(media.createdAt)).all().map(toItem);
+  const items = db.select().from(media).orderBy(desc(media.createdAt)).all().map(toItem);
+  return includeDemo ? items : items.filter((item) => !item.isDemo);
 }
 
 const altSchema = z.string().trim().max(300, 'Use at most 300 characters.');
@@ -118,7 +129,16 @@ export async function uploadImage(
   let format: string | undefined;
   try {
     format = (await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS }).metadata()).format;
-  } catch {
+  } catch (error) {
+    // Regression: oversized images were reported as an unsupported format.
+    if (error instanceof Error && /pixel limit/i.test(error.message)) {
+      return {
+        ok: false,
+        errors: {
+          file: `This image is too large. Use at most ${MAX_INPUT_PIXELS / 1e6} megapixels.`,
+        },
+      };
+    }
     format = undefined;
   }
   if (!format || !ACCEPTED_FORMATS.has(format)) {
@@ -169,6 +189,7 @@ export async function uploadImage(
       bytes: large.data.length,
       createdBy: ctx.actor.id,
       createdAt: nowIso(),
+      isDemo: false, // staff uploads are never demo content
     };
     db.insert(media).values(row).run();
     recordAudit(db, {

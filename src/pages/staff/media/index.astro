@@ -98,6 +98,7 @@ const media = listMedia(db, actor);
             </a>
             <span class="media-meta subtle">
               {item.width}×{item.height} · {formatDate(item.createdAt)}
+              {item.isDemo && ' · Demo content (demo products only)'}
             </span>
           </li>
         ))}

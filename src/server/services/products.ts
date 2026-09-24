@@ -77,6 +77,8 @@ export interface Product {
   launchedOn: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Created by `npm run demo:seed`. */
+  isDemo: boolean;
 }
 
 export interface ProductListing extends Product {
@@ -92,6 +94,15 @@ type ProductRow = typeof products.$inferSelect;
 
 const featureShape = z.object({ title: z.string(), body: z.string() });
 
+/**
+ * Demo-seed images belong to demo products only. A real product that still
+ * points at one (possible in databases seeded before the demo flag existed)
+ * is shown without it.
+ */
+function usableMedia(item: MediaItem | undefined, productIsDemo: boolean): item is MediaItem {
+  return item !== undefined && (!item.isDemo || productIsDemo);
+}
+
 /** Row → domain object. JSON columns are parsed defensively: bad data yields empty lists. */
 function toProduct(row: ProductRow, mediaById: Map<string, MediaItem>): Product {
   const features = parseJsonArray(row.features).flatMap((f) => {
@@ -102,6 +113,7 @@ function toProduct(row: ProductRow, mediaById: Map<string, MediaItem>): Product 
     (v): v is string => typeof v === 'string' && MINECRAFT_VERSION.test(v),
   );
   const platforms = parseJsonArray(row.platforms).filter(isPlatformKey);
+  const artwork = row.artworkId ? mediaById.get(row.artworkId) : undefined;
   return {
     id: row.id,
     slug: row.slug,
@@ -113,7 +125,7 @@ function toProduct(row: ProductRow, mediaById: Map<string, MediaItem>): Product 
     featured: row.featured,
     sortOrder: row.sortOrder,
     accent: isAccentKey(row.accent) ? row.accent : 'neutral',
-    artwork: row.artworkId ? (mediaById.get(row.artworkId) ?? null) : null,
+    artwork: usableMedia(artwork, row.isDemo) ? artwork : null,
     features,
     minecraftVersions,
     platforms,
@@ -124,6 +136,7 @@ function toProduct(row: ProductRow, mediaById: Map<string, MediaItem>): Product 
     launchedOn: row.launchedOn,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    isDemo: row.isDemo,
   };
 }
 
@@ -210,10 +223,10 @@ export function getPublishedProduct(db: Db, slug: string): ProductDetail | null 
     .get();
   if (!row) return null;
   const [listing] = toListings(db, [row]);
-  return listing ? { ...listing, screenshots: screenshotsFor(db, row.id) } : null;
+  return listing ? { ...listing, screenshots: screenshotsFor(db, row.id, row.isDemo) } : null;
 }
 
-function screenshotsFor(db: Db, productId: number): MediaItem[] {
+function screenshotsFor(db: Db, productId: number, productIsDemo: boolean): MediaItem[] {
   const links = db
     .select()
     .from(productMedia)
@@ -226,7 +239,7 @@ function screenshotsFor(db: Db, productId: number): MediaItem[] {
   );
   return links.flatMap((l) => {
     const item = items.get(l.mediaId);
-    return item ? [item] : [];
+    return usableMedia(item, productIsDemo) ? [item] : [];
   });
 }
 
@@ -268,7 +281,7 @@ export function getProductForStaff(db: Db, actor: Actor, id: number): ProductDet
   if (!row) throw new NotFoundError();
   const [listing] = toListings(db, [row]);
   if (!listing) throw new NotFoundError();
-  return { ...listing, screenshots: screenshotsFor(db, id) };
+  return { ...listing, screenshots: screenshotsFor(db, id, row.isDemo) };
 }
 
 // ---------------------------------------------------------------------------
@@ -330,15 +343,28 @@ export const productInputSchema = z.object({
 
 type ValidProductInput = z.output<typeof productInputSchema>;
 
-function checkMediaExists(db: Db, input: ValidProductInput): Record<string, string> {
+const DEMO_MEDIA_ERROR =
+  'This image is demo content from the demo seed. Choose your own image, or none.';
+
+/** Selected images must exist, and real products may not use demo-seed images. */
+function checkMedia(
+  db: Db,
+  input: ValidProductInput,
+  productIsDemo: boolean,
+): Record<string, string> {
   const ids = [...(input.artworkId ? [input.artworkId] : []), ...input.screenshotIds];
   const found = getMediaItems(db, ids);
   const errors: Record<string, string> = {};
-  if (input.artworkId && !found.has(input.artworkId)) {
-    errors.artworkId = 'The selected artwork no longer exists.';
+  if (input.artworkId) {
+    const artwork = found.get(input.artworkId);
+    if (!artwork) errors.artworkId = 'The selected artwork no longer exists.';
+    else if (!usableMedia(artwork, productIsDemo)) errors.artworkId = DEMO_MEDIA_ERROR;
   }
-  if (input.screenshotIds.some((id) => !found.has(id))) {
+  const screenshots = input.screenshotIds.map((id) => found.get(id));
+  if (screenshots.some((item) => item === undefined)) {
     errors.screenshotIds = 'A selected screenshot no longer exists.';
+  } else if (screenshots.some((item) => !usableMedia(item, productIsDemo))) {
+    errors.screenshotIds = DEMO_MEDIA_ERROR;
   }
   return errors;
 }
@@ -386,7 +412,8 @@ export function createProduct(
   assertCan(ctx.actor, 'products.manage');
   const parsed = validate(productInputSchema, input);
   if (!parsed.ok) return parsed;
-  const mediaErrors = checkMediaExists(db, parsed.value);
+  // Products created here are real products; only the demo seed makes demo ones.
+  const mediaErrors = checkMedia(db, parsed.value, false);
   if (Object.keys(mediaErrors).length > 0) return { ok: false, errors: mediaErrors };
   const at = nowIso();
   try {
@@ -424,10 +451,10 @@ export function updateProduct(
   if (!existing) throw new NotFoundError();
   const parsed = validate(productInputSchema, input);
   if (!parsed.ok) return parsed;
-  const mediaErrors = checkMediaExists(db, parsed.value);
+  const mediaErrors = checkMedia(db, parsed.value, existing.isDemo);
   if (Object.keys(mediaErrors).length > 0) return { ok: false, errors: mediaErrors };
   const columns = toColumns(parsed.value);
-  const previousScreens = screenshotsFor(db, id).map((m) => m.id);
+  const previousScreens = screenshotsFor(db, id, existing.isDemo).map((m) => m.id);
   try {
     db.transaction((tx) => {
       tx.update(products)

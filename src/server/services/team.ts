@@ -44,19 +44,23 @@ function toMembers(db: Db, rows: (typeof teamMembers.$inferSelect)[]): TeamMembe
     db,
     rows.flatMap((r) => (r.avatarId ? [r.avatarId] : [])),
   );
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    roleTitle: row.roleTitle,
-    bio: row.bio,
-    avatar: row.avatarId ? (avatars.get(row.avatarId) ?? null) : null,
-    links: parseJsonArray(row.links).flatMap((l) => {
-      const parsed = linkShape.safeParse(l);
-      return parsed.success && urlProblem(parsed.data.url) === null ? [parsed.data] : [];
-    }),
-    sortOrder: row.sortOrder,
-    visibility: row.visibility,
-  }));
+  return rows.map((row) => {
+    const avatar = row.avatarId ? avatars.get(row.avatarId) : undefined;
+    return {
+      id: row.id,
+      name: row.name,
+      roleTitle: row.roleTitle,
+      bio: row.bio,
+      // Demo-seed images are never shown on team profiles.
+      avatar: avatar && !avatar.isDemo ? avatar : null,
+      links: parseJsonArray(row.links).flatMap((l) => {
+        const parsed = linkShape.safeParse(l);
+        return parsed.success && urlProblem(parsed.data.url) === null ? [parsed.data] : [];
+      }),
+      sortOrder: row.sortOrder,
+      visibility: row.visibility,
+    };
+  });
 }
 
 const order = [asc(teamMembers.sortOrder), asc(teamMembers.name)];
@@ -136,8 +140,16 @@ function toColumns(input: z.output<typeof teamInputSchema>) {
 }
 
 function checkAvatar(db: Db, avatarId: string): Result<null> {
-  if (!avatarId || getMediaItems(db, [avatarId]).has(avatarId)) return { ok: true, value: null };
-  return { ok: false, errors: { avatarId: 'The selected image no longer exists.' } };
+  if (!avatarId) return { ok: true, value: null };
+  const item = getMediaItems(db, [avatarId]).get(avatarId);
+  if (!item) return { ok: false, errors: { avatarId: 'The selected image no longer exists.' } };
+  if (item.isDemo) {
+    return {
+      ok: false,
+      errors: { avatarId: 'This image is demo content from the demo seed. Choose your own image.' },
+    };
+  }
+  return { ok: true, value: null };
 }
 
 export function createTeamMember(

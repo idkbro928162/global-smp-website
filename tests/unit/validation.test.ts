@@ -5,6 +5,7 @@ import {
   releaseVersionSchema,
   slugSchema,
   urlProblem,
+  slugFromName,
 } from '../../src/lib/validation.ts';
 
 describe('urlProblem', () => {
@@ -62,5 +63,16 @@ describe('isValidIsoDate', () => {
     expect(isValidIsoDate('2026-02-30')).toBe(false);
     expect(isValidIsoDate('2026-2-3')).toBe(false);
     expect(isValidIsoDate('')).toBe(false);
+  });
+});
+
+describe('slugFromName', () => {
+  it('derives a valid slug from a product name', () => {
+    expect(slugFromName('Anti ESP')).toBe('anti-esp');
+    expect(slugFromName('  Élan — Warps 2! ')).toBe('elan-warps-2');
+    expect(slugFromName('!!!')).toBe('');
+    const long = slugFromName('word '.repeat(40));
+    expect(long.length).toBeLessThanOrEqual(64);
+    expect(long.endsWith('-')).toBe(false);
   });
 });

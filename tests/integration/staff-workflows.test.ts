@@ -78,6 +78,31 @@ describe('content workflow', () => {
     expect(html).not.toContain('Buy on BuiltByBit');
   });
 
+  it('presents an unreleased product without inventing missing details', async () => {
+    const editor = await signIn('editor@example.test', IP);
+    const response = await editor.post(
+      '/staff/products/new',
+      productFields({
+        name: 'Unreleased Plugin',
+        // Left empty: the slug is created from the name.
+        slug: '',
+        availability: 'in_development',
+        visibility: 'published',
+        minecraftVersions: '',
+        platforms: [],
+        javaVersion: '',
+        builtbybitUrl: '',
+      }),
+    );
+    expect(response.status).toBe(303);
+    const html = await (await get('/products/unreleased-plugin')).text();
+    expect(html).toContain('Not available to buy yet.');
+    expect(html).toContain('No releases published yet');
+    expect(html).toMatch(/<dt[^>]*>Compatibility<\/dt>\s*<dd[^>]*>\s*<span[^>]*>Not published yet/);
+    expect(html).toContain('Questions about Unreleased Plugin?');
+    expect(html).not.toMatch(/(Buy|View) on BuiltByBit/);
+  });
+
   it('returns field errors for invalid input without saving', async () => {
     const editor = await signIn('editor@example.test', IP);
     const response = await editor.post(

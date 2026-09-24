@@ -74,8 +74,12 @@ const email = settings['contact.email'];
 
 <style>
   .services {
-    max-width: calc(60rem + 2 * var(--gutter));
     padding-block: var(--space-7) var(--space-9);
+  }
+
+  /* Keep a readable width but align with the page header, like other pages. */
+  .services > :global(*) {
+    max-width: 60rem;
   }
 
   /* Rendered by the Markdown component, so outside this file's style scope. */

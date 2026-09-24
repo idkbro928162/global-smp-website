@@ -1,7 +1,9 @@
 /**
  * DEVELOPMENT ONLY: fills an empty local database with clearly labelled demo
  * content so layouts can be reviewed. Every item is named "Demo …" and says it
- * is not a real product. It creates no staff accounts or credentials.
+ * is not a real product. Demo products and images are flagged `is_demo`, so
+ * demo images cannot be attached to real products. It creates no staff
+ * accounts or credentials.
  *
  * Refuses to run when NODE_ENV=production, when SITE_URL is https, or when the
  * database already contains products.
@@ -74,6 +76,7 @@ async function demoImage(label: string, hue: number, width = 1600, height = 900)
       height: lg.height,
       bytes: lg.size,
       createdAt: nowIso(),
+      isDemo: true,
     })
     .run();
   return id;
@@ -176,6 +179,7 @@ for (const [index, demo] of demoProducts.entries()) {
       platforms: JSON.stringify(input.platforms),
       createdAt: at,
       updatedAt: at,
+      isDemo: true,
     })
     .returning({ id: products.id })
     .get();

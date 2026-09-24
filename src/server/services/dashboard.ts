@@ -138,7 +138,14 @@ export function getDashboard(db: Db, actor: Actor): DashboardData {
         linkLabel: 'Manage products',
       });
     }
-    const noArtwork = productNames(db, and(published, sql`${products.artworkId} IS NULL`));
+    // Demo-seed artwork on a real product is not shown, so it counts as none.
+    const noArtwork = productNames(
+      db,
+      and(
+        published,
+        sql`(${products.artworkId} IS NULL OR (${products.isDemo} = 0 AND ${products.artworkId} IN (SELECT id FROM media WHERE is_demo = 1)))`,
+      ),
+    );
     if (noArtwork.length > 0) {
       checklist.push({
         tone: 'info',
@@ -160,6 +167,15 @@ export function getDashboard(db: Db, actor: Actor): DashboardData {
         tone: 'info',
         message: `Published without documentation: ${listNames(noDocs)}.`,
         ...(can(actor, 'docs.manage') ? { href: '/staff/docs', linkLabel: 'Manage docs' } : {}),
+      });
+    }
+    const demo = productNames(db, eq(products.isDemo, true));
+    if (demo.length > 0) {
+      checklist.push({
+        tone: 'warning',
+        message: `This database contains demo content from the demo seed (${listNames(demo)}, plus demo releases, docs, services, team entries and images). Delete it before launch.`,
+        href: '/staff/products',
+        linkLabel: 'Manage products',
       });
     }
   }

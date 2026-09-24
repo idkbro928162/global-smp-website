@@ -10,7 +10,7 @@ import TextArea from '../../../../components/staff/form/TextArea.astro';
 import StaffLayout from '../../../../layouts/StaffLayout.astro';
 import { ACCENTS, AVAILABILITY, PLATFORMS } from '../../../../lib/catalog.ts';
 import { renderMarkdown, type SafeHtml } from '../../../../lib/markdown.ts';
-import { LIMITS } from '../../../../lib/validation.ts';
+import { LIMITS, slugFromName } from '../../../../lib/validation.ts';
 import { getDb } from '../../../../server/db/client.ts';
 import { listMedia } from '../../../../server/services/media.ts';
 import {
@@ -47,6 +47,8 @@ let preview: SafeHtml | null = null;
 if (Astro.request.method === 'POST') {
   const form = submittedForm(Astro);
   values = productValuesFromForm(form);
+  // New products get a slug from their name unless one was typed.
+  if (isNew && !values.slug.trim()) values.slug = slugFromName(values.name);
   if (field(form, 'intent') === 'preview') {
     preview = renderMarkdown(values.description, { baseLevel: 3 }).html;
   } else {
@@ -65,7 +67,8 @@ if (Astro.request.method === 'POST') {
   }
 }
 
-const media = listMedia(db, actor);
+// Demo-seed images are only offered to demo products.
+const media = listMedia(db, actor, { includeDemo: existing?.isDemo ?? false });
 // Always offer a few blank rows for new features (no JavaScript needed).
 const featureRows = [
   ...values.features,
@@ -137,10 +140,14 @@ for (let i = 0; i < featureRows.length; i++) {
             name="slug"
             label="URL slug"
             value={values.slug}
-            required
+            required={!isNew}
             maxlength={64}
             mono
-            hint="Lowercase letters, numbers and hyphens. Changing it changes the product's URL."
+            hint={
+              isNew
+                ? 'Used in the product URL, e.g. /products/anti-esp. Leave empty to create it from the name.'
+                : "Lowercase letters, numbers and hyphens. Changing it changes the product's URL and breaks old links."
+            }
             error={errors.slug}
           />
         </div>
@@ -186,6 +193,7 @@ for (let i = 0; i < featureRows.length; i++) {
             required
             value={values.availability}
             options={Object.entries(AVAILABILITY).map(([value, a]) => ({ value, label: a.label }))}
+            hint="The product's status, shown as a badge. Visibility decides whether the page is on the website at all."
             error={errors.availability}
           />
         </div>
@@ -268,7 +276,7 @@ for (let i = 0; i < featureRows.length; i++) {
           type="url"
           value={values.builtbybitUrl}
           maxlength={LIMITS.url}
-          hint="The product's BuiltByBit listing. Shows the “Buy on BuiltByBit” button when set."
+          hint="A builtbybit.com link. Shows “Buy on BuiltByBit” when the product is Available, otherwise “View on BuiltByBit”. Leave empty until the listing exists."
           error={errors.builtbybitUrl}
         />
         <Field
@@ -294,6 +302,7 @@ for (let i = 0; i < featureRows.length; i++) {
           label="First released"
           type="date"
           value={values.launchedOn}
+          hint="Date of the first public release. Leave empty until the product has been released."
           error={errors.launchedOn}
         />
       </div>

@@ -98,6 +98,8 @@ export const media = sqliteTable('media', {
   bytes: integer('bytes').notNull(),
   createdBy: integer('created_by'),
   createdAt: text('created_at').notNull(),
+  /** Created by `npm run demo:seed`. Never offered for, or shown on, real content. */
+  isDemo: integer('is_demo', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const products = sqliteTable('products', {
@@ -121,6 +123,8 @@ export const products = sqliteTable('products', {
   supportUrl: text('support_url').notNull().default(''),
   launchedOn: text('launched_on'),
   ...timestamps,
+  /** Created by `npm run demo:seed`. Staff cannot set this. */
+  isDemo: integer('is_demo', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const productMedia = sqliteTable(
