@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output / framework caches
+dist/
+.astro/
+
+# Runtime data: SQLite database, uploaded media, backups.
+# Never commit this directory — it contains staff accounts and session data.
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# Environment files (commit only .env.example)
+.env
+.env.*
+!.env.example
+
+# Private keys / certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Test and tool output
+coverage/
+test-results/
+playwright-report/
+blob-report/
+*.log
+npm-debug.log*
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp

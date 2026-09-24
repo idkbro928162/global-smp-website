@@ -1,0 +1,151 @@
+---
+/** Create (/staff/services/new) or edit (/staff/services/<id>) a service offering. */
+import CsrfField from '../../../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../../components/staff/form/Field.astro';
+import Select from '../../../../components/staff/form/Select.astro';
+import TextArea from '../../../../components/staff/form/TextArea.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { renderMarkdown, type SafeHtml } from '../../../../lib/markdown.ts';
+import { LIMITS } from '../../../../lib/validation.ts';
+import { getDb } from '../../../../server/db/client.ts';
+import {
+  createOffering,
+  getOfferingForStaff,
+  updateOffering,
+} from '../../../../server/services/offerings.ts';
+import {
+  field,
+  mutationContext,
+  parseId,
+  requirePermission,
+  submittedForm,
+} from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'content.manage');
+const db = getDb();
+const isNew = Astro.params.id === 'new';
+const id = isNew ? null : parseId(Astro.params.id);
+if (!isNew && id === null) return Astro.rewrite('/404');
+
+const existing = id !== null ? getOfferingForStaff(db, actor, id) : null;
+const FIELDS = ['title', 'summary', 'body', 'sortOrder', 'visibility'] as const;
+let values: Record<(typeof FIELDS)[number], string> = {
+  title: existing?.title ?? '',
+  summary: existing?.summary ?? '',
+  body: existing?.body ?? '',
+  sortOrder: String(existing?.sortOrder ?? 0),
+  visibility: existing?.visibility ?? 'draft',
+};
+let errors: Record<string, string> = {};
+let preview: SafeHtml | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  values = Object.fromEntries(FIELDS.map((name) => [name, field(form, name)])) as typeof values;
+  if (field(form, 'intent') === 'preview') {
+    preview = renderMarkdown(values.body, { baseLevel: 3 }).html;
+  } else {
+    const ctx = mutationContext(Astro);
+    const result =
+      id === null ? createOffering(db, ctx, values) : updateOffering(db, ctx, id, values);
+    if (result.ok) {
+      return Astro.redirect(
+        `/staff/services/${result.value.id}?notice=${id === null ? 'created' : 'saved'}`,
+        303,
+      );
+    }
+    errors = result.errors;
+  }
+}
+---
+
+<StaffLayout
+  title={existing ? existing.title : 'New service'}
+  back={{ href: '/staff/services', label: 'Services' }}
+>
+  <form method="post" class="form" novalidate>
+    <CsrfField />
+    <button type="submit" name="intent" value="save" hidden tabindex="-1">
+      Save
+    </button>
+    <ErrorSummary
+      errors={errors}
+      labels={{
+        title: 'Title',
+        summary: 'Summary',
+        body: 'Description',
+        sortOrder: 'Order',
+        visibility: 'Visibility',
+      }}
+    />
+    <div class="card form">
+      <Field
+        name="title"
+        label="Title"
+        value={values.title}
+        required
+        maxlength={LIMITS.shortText}
+        hint="e.g. “Custom plugin development”."
+        error={errors.title}
+      />
+      <Field
+        name="summary"
+        label="Summary"
+        value={values.summary}
+        maxlength={LIMITS.summary}
+        error={errors.summary}
+      />
+      <TextArea
+        name="body"
+        label="Description"
+        value={values.body}
+        rows={10}
+        maxlength={LIMITS.markdown}
+        markdown
+        preview={preview}
+        hint="Describe the service accurately. Avoid promises (prices, turnaround times) you cannot guarantee."
+        error={errors.body}
+      />
+      <div class="form-row">
+        <Field
+          name="sortOrder"
+          label="Order"
+          type="number"
+          value={values.sortOrder}
+          required
+          min={-999}
+          max={999}
+          error={errors.sortOrder}
+        />
+        <Select
+          name="visibility"
+          label="Visibility"
+          required
+          value={values.visibility}
+          options={[
+            { value: 'draft', label: 'Draft' },
+            { value: 'published', label: 'Published' },
+          ]}
+          error={errors.visibility}
+        />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="button button--primary" type="submit" name="intent" value="save">
+        {existing ? 'Save changes' : 'Create service'}
+      </button>
+      <a class="button" href="/staff/services">
+        Cancel
+      </a>
+      {existing && (
+        <a
+          class="button button--danger form-actions__end"
+          href={`/staff/services/${existing.id}/delete`}
+        >
+          Delete…
+        </a>
+      )}
+    </div>
+  </form>
+</StaffLayout>

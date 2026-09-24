@@ -1,0 +1,184 @@
+---
+/** Create (/staff/team/new) or edit (/staff/team/<id>) a public team profile. */
+import CsrfField from '../../../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../../components/staff/form/Field.astro';
+import MediaPicker from '../../../../components/staff/form/MediaPicker.astro';
+import Select from '../../../../components/staff/form/Select.astro';
+import TextArea from '../../../../components/staff/form/TextArea.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { LIMITS } from '../../../../lib/validation.ts';
+import { getDb } from '../../../../server/db/client.ts';
+import { listMedia } from '../../../../server/services/media.ts';
+import {
+  createTeamMember,
+  getTeamMemberForStaff,
+  updateTeamMember,
+} from '../../../../server/services/team.ts';
+import { emptyTeamValues, teamValues, teamValuesFromForm } from '../../../../server/staff/forms.ts';
+import {
+  mutationContext,
+  parseId,
+  requirePermission,
+  submittedForm,
+} from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'team.manage');
+const db = getDb();
+const isNew = Astro.params.id === 'new';
+const id = isNew ? null : parseId(Astro.params.id);
+if (!isNew && id === null) return Astro.rewrite('/404');
+
+const existing = id !== null ? getTeamMemberForStaff(db, actor, id) : null;
+let values = existing ? teamValues(existing) : emptyTeamValues();
+let errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST') {
+  values = teamValuesFromForm(submittedForm(Astro));
+  const ctx = mutationContext(Astro);
+  const result =
+    id === null ? createTeamMember(db, ctx, values) : updateTeamMember(db, ctx, id, values);
+  if (result.ok) {
+    return Astro.redirect(
+      `/staff/team/${result.value.id}?notice=${id === null ? 'created' : 'saved'}`,
+      303,
+    );
+  }
+  errors = result.errors;
+}
+
+const media = listMedia(db, actor);
+const linkRows = [
+  ...values.links,
+  ...Array.from({ length: Math.max(1, 3 - values.links.length) }, () => ({ label: '', url: '' })),
+].slice(0, LIMITS.maxLinks);
+const labels: Record<string, string> = {
+  name: 'Name',
+  roleTitle: 'Role title',
+  bio: 'Bio',
+  avatarId: 'Photo',
+  sortOrder: 'Order',
+  visibility: 'Visibility',
+  links: 'Links',
+};
+linkRows.forEach((_, i) => {
+  labels[`links.${i}.label`] = `Link ${i + 1} label`;
+  labels[`links.${i}.url`] = `Link ${i + 1} URL`;
+});
+---
+
+<StaffLayout
+  title={existing ? existing.name : 'New team profile'}
+  back={{ href: '/staff/team', label: 'Team page' }}
+>
+  <form method="post" class="form" novalidate>
+    <CsrfField />
+    <ErrorSummary errors={errors} labels={labels} />
+    <div class="card form">
+      <div class="form-row">
+        <Field
+          name="name"
+          label="Name"
+          value={values.name}
+          required
+          maxlength={LIMITS.name}
+          error={errors.name}
+        />
+        <Field
+          name="roleTitle"
+          label="Role title"
+          value={values.roleTitle}
+          maxlength={LIMITS.name}
+          hint="e.g. “Lead developer”."
+          error={errors.roleTitle}
+        />
+      </div>
+      <TextArea
+        name="bio"
+        label="Bio"
+        value={values.bio}
+        rows={4}
+        maxlength={1000}
+        error={errors.bio}
+      />
+      <MediaPicker
+        name="avatarId"
+        legend="Photo"
+        media={media}
+        selected={[values.avatarId]}
+        hint="Square images work best. Without a photo, initials are shown."
+        error={errors.avatarId}
+      />
+    </div>
+    <div class="card form">
+      <h2>Links</h2>
+      {errors.links && <p class="field__error">{errors.links}</p>}
+      <div class="feature-rows">
+        {linkRows.map((link, i) => (
+          <div class="feature-row">
+            <Field
+              name={`links.${i}.label`}
+              label={`Link ${i + 1} label`}
+              value={link.label}
+              maxlength={40}
+              error={errors[`links.${i}.label`]}
+            />
+            <Field
+              name={`links.${i}.url`}
+              label={`Link ${i + 1} URL`}
+              type="url"
+              value={link.url}
+              maxlength={LIMITS.url}
+              error={errors[`links.${i}.url`]}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+    <div class="card form-row">
+      <Field
+        name="sortOrder"
+        label="Order"
+        type="number"
+        value={values.sortOrder}
+        required
+        min={-999}
+        max={999}
+        error={errors.sortOrder}
+      />
+      <Select
+        name="visibility"
+        label="Visibility"
+        required
+        value={values.visibility}
+        options={[
+          { value: 'draft', label: 'Draft' },
+          { value: 'published', label: 'Published' },
+        ]}
+        error={errors.visibility}
+      />
+    </div>
+    <div class="form-actions">
+      <button class="button button--primary" type="submit">
+        {existing ? 'Save changes' : 'Create profile'}
+      </button>
+      <a class="button" href="/staff/team">
+        Cancel
+      </a>
+      {existing && (
+        <a
+          class="button button--danger form-actions__end"
+          href={`/staff/team/${existing.id}/delete`}
+        >
+          Delete…
+        </a>
+      )}
+    </div>
+  </form>
+</StaffLayout>
+
+<style>
+  .card > h2 {
+    margin-bottom: 0;
+  }
+</style>

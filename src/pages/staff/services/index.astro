@@ -1,0 +1,63 @@
+---
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { VISIBILITY } from '../../../lib/catalog.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { listOfferingsForStaff } from '../../../server/services/offerings.ts';
+import { requirePermission } from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'content.manage');
+const offerings = listOfferingsForStaff(getDb(), actor);
+---
+
+<StaffLayout title="Services">
+  <a slot="actions" class="button button--primary button--small" href="/staff/services/new">
+    New service
+  </a>
+  <p class="intro muted">
+    Development services listed on the public <a href="/services">Services</a> page. The page intro
+    is edited under <a href="/staff/content">Site copy</a>.
+  </p>
+  {offerings.length === 0 ? (
+    <div class="empty-state">
+      <p>No services yet. The public page shows an empty state until one is published.</p>
+    </div>
+  ) : (
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption class="visually-hidden">Services</caption>
+        <thead>
+          <tr>
+            <th scope="col">Service</th>
+            <th scope="col">Order</th>
+            <th scope="col">Visibility</th>
+          </tr>
+        </thead>
+        <tbody>
+          {offerings.map((offering) => (
+            <tr>
+              <td class="data-table__primary">
+                <a href={`/staff/services/${offering.id}`}>{offering.title}</a>
+                {offering.summary && <span class="data-table__secondary">{offering.summary}</span>}
+              </td>
+              <td class="mono">{offering.sortOrder}</td>
+              <td>
+                <span
+                  class:list={['badge', { 'badge--positive': offering.visibility === 'published' }]}
+                >
+                  {VISIBILITY[offering.visibility]}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</StaffLayout>
+
+<style>
+  .intro {
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+  }
+</style>

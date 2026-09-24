@@ -1,0 +1,45 @@
+---
+/**
+ * Displays a freshly issued one-time account link. It is rendered only in the
+ * response to the POST that created it and is never stored in readable form.
+ */
+import { formatDateTime } from '../../lib/format.ts';
+import { getConfig } from '../../server/config.ts';
+import type { IssuedToken } from '../../server/services/auth.ts';
+
+interface Props {
+  link: IssuedToken;
+  email: string;
+}
+
+const { link, email } = Astro.props;
+const url = `${getConfig().siteUrl}/staff/setup/${link.token}`;
+---
+
+<section class="notice notice--warning one-time" role="status" aria-labelledby="one-time-title">
+  <h2 id="one-time-title">
+    {link.purpose === 'setup' ? 'Account setup link' : 'Password reset link'} for {email}
+  </h2>
+  <p>
+    Send this link to them privately (for example in a Discord direct message). It works once and
+    expires {formatDateTime(link.expiresAt.toISOString())}.
+    <strong>It will not be shown again.</strong>
+  </p>
+  <code class="link-box">{url}</code>
+</section>
+
+<style>
+  .one-time {
+    display: grid;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+  }
+
+  .one-time h2 {
+    font-size: var(--text-lg);
+  }
+
+  .one-time p {
+    font-size: var(--text-sm);
+  }
+</style>

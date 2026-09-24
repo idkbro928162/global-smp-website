@@ -1,0 +1,182 @@
+---
+import CsrfField from '../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../components/staff/form/ErrorSummary.astro';
+import Field from '../../components/staff/form/Field.astro';
+import StaffLayout from '../../layouts/StaffLayout.astro';
+import { PERMISSIONS } from '../../server/auth/permissions.ts';
+import { PASSWORD_MIN_LENGTH } from '../../server/auth/passwords.ts';
+import { countUserSessions } from '../../server/auth/sessions.ts';
+import { getDb } from '../../server/db/client.ts';
+import {
+  changeOwnPassword,
+  signOutOtherSessions,
+  updateOwnProfile,
+} from '../../server/services/auth.ts';
+import { field, mutationContext, requireActor, submittedForm } from '../../server/staff/page.ts';
+
+// Every signed-in staff member may manage their own account.
+const actor = requireActor(Astro);
+const db = getDb();
+const session = Astro.locals.session!;
+let profileErrors: Record<string, string> = {};
+let passwordErrors: Record<string, string> = {};
+let displayName = actor.displayName;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  const intent = field(form, 'intent');
+  const ctx = mutationContext(Astro);
+  if (intent === 'profile') {
+    displayName = field(form, 'displayName');
+    const result = updateOwnProfile(db, ctx, { displayName });
+    if (result.ok) return Astro.redirect('/staff/account?notice=saved', 303);
+    profileErrors = result.errors;
+  } else if (intent === 'password') {
+    const result = await changeOwnPassword(
+      db,
+      { ...ctx, sessionId: session.id },
+      {
+        current: field(form, 'current'),
+        next: field(form, 'next'),
+        confirm: field(form, 'confirm'),
+      },
+    );
+    if (result.ok) return Astro.redirect('/staff/account?notice=password-changed', 303);
+    passwordErrors = result.errors;
+  } else if (intent === 'sessions') {
+    signOutOtherSessions(db, { ...ctx, sessionId: session.id });
+    return Astro.redirect('/staff/account?notice=sessions-revoked', 303);
+  }
+}
+
+const otherSessions = Math.max(0, countUserSessions(db, actor.id) - 1);
+const permissions = [...actor.permissions].map((p) => PERMISSIONS[p].label);
+---
+
+<StaffLayout title="Your account">
+  <div class="stack account">
+    <section class="card" aria-labelledby="profile-title">
+      <h2 id="profile-title">Profile</h2>
+      <dl class="kv">
+        <dt>Email</dt>
+        <dd>{actor.email}</dd>
+        <dt>Role</dt>
+        <dd>{actor.role.name}</dd>
+        <dt>Permissions</dt>
+        <dd>{permissions.join(', ') || 'None'}</dd>
+      </dl>
+      <form method="post" class="form profile-form" novalidate>
+        <CsrfField />
+        <input type="hidden" name="intent" value="profile" />
+        <ErrorSummary errors={profileErrors} labels={{ displayName: 'Display name' }} />
+        <Field
+          name="displayName"
+          label="Display name"
+          value={displayName}
+          required
+          maxlength={80}
+          error={profileErrors.displayName}
+        />
+        <div>
+          <button class="button" type="submit">
+            Save profile
+          </button>
+        </div>
+      </form>
+      <p class="subtle note">
+        Your email address and role can only be changed by an administrator.
+      </p>
+    </section>
+
+    <section class="card" aria-labelledby="password-title">
+      <h2 id="password-title">Change password</h2>
+      <form method="post" class="form" novalidate>
+        <CsrfField />
+        <input type="hidden" name="intent" value="password" />
+        <input type="text" name="username" value={actor.email} autocomplete="username" hidden />
+        <ErrorSummary
+          errors={passwordErrors}
+          labels={{
+            current: 'Current password',
+            next: 'New password',
+            confirm: 'Confirm password',
+          }}
+        />
+        <Field
+          name="current"
+          label="Current password"
+          type="password"
+          required
+          autocomplete="current-password"
+          maxlength={256}
+          error={passwordErrors.current}
+        />
+        <Field
+          name="next"
+          label="New password"
+          type="password"
+          required
+          autocomplete="new-password"
+          maxlength={256}
+          hint={`At least ${PASSWORD_MIN_LENGTH} characters. Changing it signs out your other sessions.`}
+          error={passwordErrors.next}
+        />
+        <Field
+          name="confirm"
+          label="Confirm new password"
+          type="password"
+          required
+          autocomplete="new-password"
+          maxlength={256}
+          error={passwordErrors.confirm}
+        />
+        <div>
+          <button class="button" type="submit">
+            Change password
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="sessions-title">
+      <h2 id="sessions-title">Sessions</h2>
+      <p class="muted">
+        {otherSessions === 0
+          ? 'You are not signed in anywhere else.'
+          : `You are signed in on ${otherSessions} other ${otherSessions === 1 ? 'device or browser' : 'devices or browsers'}.`}
+      </p>
+      {otherSessions > 0 && (
+        <form method="post" class="sessions-form">
+          <CsrfField />
+          <input type="hidden" name="intent" value="sessions" />
+          <button class="button" type="submit">
+            Sign out other sessions
+          </button>
+        </form>
+      )}
+    </section>
+  </div>
+</StaffLayout>
+
+<style>
+  .account {
+    max-width: 44rem;
+  }
+
+  .profile-form {
+    margin-top: var(--space-5);
+  }
+
+  .note {
+    margin-top: var(--space-4);
+    font-size: var(--text-xs);
+  }
+
+  .sessions-form {
+    margin-top: var(--space-4);
+  }
+
+  .card .muted {
+    font-size: var(--text-sm);
+  }
+</style>

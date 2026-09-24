@@ -1,0 +1,359 @@
+---
+import Breadcrumbs from '../../../components/Breadcrumbs.astro';
+import DocsNav from '../../../components/docs/DocsNav.astro';
+import Icon from '../../../components/Icon.astro';
+import Markdown from '../../../components/Markdown.astro';
+import SiteLayout from '../../../layouts/SiteLayout.astro';
+import { formatDate, isoDate } from '../../../lib/format.ts';
+import { markdownToText, renderMarkdown } from '../../../lib/markdown.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { getPublishedDocPage } from '../../../server/services/docs.ts';
+
+const page = getPublishedDocPage(getDb(), Astro.params.collection ?? '', Astro.params.page ?? '');
+if (!page) return Astro.rewrite('/404');
+
+const rendered = renderMarkdown(page.body, { baseLevel: 2 });
+const base = `/docs/${page.collection.key}`;
+const description = page.summary || markdownToText(page.body) || undefined;
+---
+
+<SiteLayout title={`${page.title} · ${page.collection.title} docs`} description={description}>
+  <div class="container docs-layout">
+    <aside class="docs-sidebar">
+      <details class="docs-disclosure" data-docs-nav>
+        <summary>
+          <span>Browse {page.collection.title} docs</span>
+          <Icon name="chevron" size={14} />
+        </summary>
+        <DocsNav collection={page.collection} sections={page.sections} currentSlug={page.slug} />
+      </details>
+      <div class="docs-sidebar__static">
+        <DocsNav collection={page.collection} sections={page.sections} currentSlug={page.slug} />
+      </div>
+    </aside>
+
+    <article class="docs-article" aria-labelledby="doc-title">
+      <Breadcrumbs
+        items={[
+          { href: '/docs', label: 'Docs' },
+          { href: base, label: page.collection.title },
+        ]}
+        current={page.title}
+      />
+      <header class="docs-article__header">
+        {page.section && <p class="eyebrow">{page.section}</p>}
+        <h1 id="doc-title">{page.title}</h1>
+        {page.summary && <p class="docs-article__summary">{page.summary}</p>}
+      </header>
+
+      {rendered.toc.length > 1 && (
+        <details class="docs-disclosure docs-toc-inline">
+          <summary>
+            <span>On this page</span>
+            <Icon name="chevron" size={14} />
+          </summary>
+          <ol class="toc">
+            {rendered.toc.map((entry) => (
+              <li class={`toc__item toc__item--${entry.level}`}>
+                <a href={`#${entry.id}`}>{entry.text}</a>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
+
+      {page.body.trim() ? (
+        <Markdown html={rendered.html} />
+      ) : (
+        <div class="empty-state">
+          <p>This page has no content yet.</p>
+        </div>
+      )}
+
+      <footer class="docs-article__footer">
+        <p class="subtle mono">
+          Last updated <time datetime={isoDate(page.updatedAt)}>{formatDate(page.updatedAt)}</time>
+        </p>
+        <nav class="pager" aria-label="Previous and next pages">
+          {page.previous ? (
+            <a class="pager__link" href={`${base}/${page.previous.slug}`} rel="prev">
+              <span class="pager__label">
+                <Icon name="arrow-left" size={14} /> Previous
+              </span>
+              <span class="pager__title">{page.previous.title}</span>
+            </a>
+          ) : (
+            <span />
+          )}
+          {page.next && (
+            <a class="pager__link pager__link--next" href={`${base}/${page.next.slug}`} rel="next">
+              <span class="pager__label">
+                Next <Icon name="arrow-right" size={14} />
+              </span>
+              <span class="pager__title">{page.next.title}</span>
+            </a>
+          )}
+        </nav>
+        <p class="docs-help">
+          Something unclear or missing? <a href="/support">Ask on our Discord support</a>.
+        </p>
+      </footer>
+    </article>
+
+    {rendered.toc.length > 1 && (
+      <aside class="docs-toc" aria-labelledby="on-this-page">
+        <h2 id="on-this-page" class="eyebrow eyebrow--plain">
+          On this page
+        </h2>
+        <ol class="toc">
+          {rendered.toc.map((entry) => (
+            <li class={`toc__item toc__item--${entry.level}`}>
+              <a href={`#${entry.id}`}>{entry.text}</a>
+            </li>
+          ))}
+        </ol>
+      </aside>
+    )}
+  </div>
+  <p class="visually-hidden" aria-live="polite" data-copy-status></p>
+</SiteLayout>
+
+<script>
+  // Progressive enhancement: "Copy" buttons on code blocks.
+  const status = document.querySelector<HTMLElement>('[data-copy-status]');
+  if (navigator.clipboard) {
+    for (const block of document.querySelectorAll<HTMLElement>('[data-code-block]')) {
+      const bar = block.querySelector('.code-block__bar');
+      const code = block.querySelector('code');
+      if (!bar || !code) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'code-block__copy';
+      button.textContent = 'Copy';
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(code.textContent ?? '');
+          button.textContent = 'Copied';
+          if (status) status.textContent = 'Code copied to clipboard';
+        } catch {
+          button.textContent = 'Copy failed';
+        }
+        window.setTimeout(() => {
+          button.textContent = 'Copy';
+          if (status) status.textContent = '';
+        }, 2000);
+      });
+      bar.append(button);
+    }
+  }
+  // Close the mobile docs menu after choosing a page anchor on the same page.
+  const navMenu = document.querySelector<HTMLDetailsElement>('[data-docs-nav]');
+  navMenu?.addEventListener('click', (event) => {
+    if (event.target instanceof HTMLAnchorElement) navMenu.open = false;
+  });
+</script>
+
+<style>
+  .docs-layout {
+    display: grid;
+    gap: var(--space-5);
+    padding-block: var(--space-5) var(--space-9);
+  }
+
+  .docs-sidebar__static {
+    display: none;
+  }
+
+  .docs-disclosure {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+
+  .docs-disclosure summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 2.75rem;
+    padding: 0 var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .docs-disclosure summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .docs-disclosure[open] summary {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .docs-disclosure[open] summary :global(.icon) {
+    transform: rotate(90deg);
+  }
+
+  .docs-disclosure > :not(summary) {
+    padding: var(--space-4);
+  }
+
+  .docs-article {
+    min-width: 0;
+  }
+
+  .docs-article__header h1 {
+    margin-top: var(--space-2);
+    font-size: var(--text-3xl);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+
+  .docs-article__summary {
+    margin-top: var(--space-3);
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    max-width: 40rem;
+  }
+
+  .docs-toc-inline {
+    margin-top: var(--space-5);
+  }
+
+  .docs-article__header + :global(.prose),
+  .docs-toc-inline + :global(.prose),
+  .docs-article > .empty-state {
+    margin-top: var(--space-6);
+  }
+
+  .docs-article__footer {
+    margin-top: var(--space-8);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .docs-article__footer > p:first-child {
+    font-size: var(--text-xs);
+  }
+
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+  }
+
+  .pager__link {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    text-decoration: none;
+  }
+
+  .pager__link:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface);
+  }
+
+  .pager__link--next {
+    text-align: right;
+    align-items: flex-end;
+  }
+
+  .pager__label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    color: var(--color-text-subtle);
+  }
+
+  .pager__title {
+    font-weight: 650;
+  }
+
+  .docs-help {
+    margin-top: var(--space-6);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .toc {
+    list-style: none;
+    padding: 0;
+    font-size: var(--text-sm);
+  }
+
+  .toc__item a {
+    display: block;
+    padding-block: 0.3rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    line-height: 1.35;
+  }
+
+  .toc__item a:hover {
+    color: var(--color-text);
+  }
+
+  .toc__item--3 {
+    padding-left: var(--space-4);
+  }
+
+  .docs-toc {
+    display: none;
+  }
+
+  @media (min-width: 40rem) {
+    .pager {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (min-width: 60rem) {
+    .docs-layout {
+      grid-template-columns: 15rem minmax(0, 1fr);
+      gap: var(--space-7);
+      padding-top: var(--space-7);
+    }
+
+    .docs-disclosure[data-docs-nav] {
+      display: none;
+    }
+
+    .docs-sidebar__static {
+      display: block;
+      position: sticky;
+      top: calc(var(--header-height) + var(--space-6));
+      max-height: calc(100dvh - var(--header-height) - var(--space-8));
+      overflow-y: auto;
+      padding-right: var(--space-2);
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .docs-layout {
+      grid-template-columns: 15rem minmax(0, 1fr) 13rem;
+    }
+
+    .docs-toc-inline {
+      display: none;
+    }
+
+    .docs-toc {
+      display: block;
+      position: sticky;
+      top: calc(var(--header-height) + var(--space-6));
+      align-self: start;
+      max-height: calc(100dvh - var(--header-height) - var(--space-8));
+      overflow-y: auto;
+    }
+
+    .docs-toc h2 {
+      margin-bottom: var(--space-3);
+    }
+  }
+</style>

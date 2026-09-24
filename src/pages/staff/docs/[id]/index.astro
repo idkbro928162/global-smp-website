@@ -1,0 +1,240 @@
+---
+/** Create (/staff/docs/new) or edit (/staff/docs/<id>) a documentation page. */
+import CsrfField from '../../../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../../components/staff/form/Field.astro';
+import Select from '../../../../components/staff/form/Select.astro';
+import TextArea from '../../../../components/staff/form/TextArea.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { renderMarkdown, type SafeHtml } from '../../../../lib/markdown.ts';
+import { LIMITS } from '../../../../lib/validation.ts';
+import { getDb } from '../../../../server/db/client.ts';
+import {
+  GENERAL_COLLECTION,
+  createDocPage,
+  getDocPageForStaff,
+  updateDocPage,
+} from '../../../../server/services/docs.ts';
+import { listProductOptions } from '../../../../server/services/products.ts';
+import {
+  field,
+  mutationContext,
+  parseId,
+  requirePermission,
+  submittedForm,
+} from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'docs.manage');
+const db = getDb();
+const isNew = Astro.params.id === 'new';
+const id = isNew ? null : parseId(Astro.params.id);
+if (!isNew && id === null) return Astro.rewrite('/404');
+
+const existing = id !== null ? getDocPageForStaff(db, actor, id) : null;
+const products = listProductOptions(db, actor);
+const FIELDS = [
+  'productId',
+  'title',
+  'slug',
+  'summary',
+  'section',
+  'body',
+  'sortOrder',
+  'visibility',
+] as const;
+
+let values: Record<(typeof FIELDS)[number], string> = {
+  productId: existing?.productId ? String(existing.productId) : '',
+  title: existing?.title ?? '',
+  slug: existing?.slug ?? '',
+  summary: existing?.summary ?? '',
+  section: existing?.section ?? '',
+  body: existing?.body ?? '',
+  sortOrder: String(existing?.sortOrder ?? 0),
+  visibility: existing?.visibility ?? 'draft',
+};
+let errors: Record<string, string> = {};
+let preview: SafeHtml | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  values = Object.fromEntries(FIELDS.map((name) => [name, field(form, name)])) as typeof values;
+  if (field(form, 'intent') === 'preview') {
+    preview = renderMarkdown(values.body, { baseLevel: 2 }).html;
+  } else {
+    const ctx = mutationContext(Astro);
+    const result =
+      id === null ? createDocPage(db, ctx, values) : updateDocPage(db, ctx, id, values);
+    if (result.ok) {
+      return Astro.redirect(
+        `/staff/docs/${result.value.id}?notice=${id === null ? 'created' : 'saved'}`,
+        303,
+      );
+    }
+    errors = result.errors;
+  }
+}
+
+const publicUrl =
+  existing && existing.visibility === 'published'
+    ? `/docs/${existing.productSlug ?? GENERAL_COLLECTION}/${existing.slug}`
+    : null;
+---
+
+<StaffLayout
+  title={existing ? existing.title : 'New documentation page'}
+  back={{ href: '/staff/docs', label: 'Documentation' }}
+>
+  <Fragment slot="actions">
+    {publicUrl && (
+      <a class="button button--small" href={publicUrl}>
+        View on site
+      </a>
+    )}
+  </Fragment>
+  <form method="post" class="form form--wide" novalidate>
+    <CsrfField />
+    <button type="submit" name="intent" value="save" hidden tabindex="-1">
+      Save
+    </button>
+    <ErrorSummary
+      errors={errors}
+      labels={{
+        productId: 'Collection',
+        title: 'Title',
+        slug: 'URL slug',
+        summary: 'Summary',
+        section: 'Sidebar section',
+        body: 'Content',
+        sortOrder: 'Order',
+        visibility: 'Visibility',
+      }}
+    />
+    <div class="docs-editor">
+      <div class="card form">
+        <Field
+          name="title"
+          label="Title"
+          value={values.title}
+          required
+          maxlength={LIMITS.shortText}
+          error={errors.title}
+        />
+        <Field
+          name="summary"
+          label="Summary"
+          value={values.summary}
+          maxlength={LIMITS.summary}
+          hint="Shown under the title and in page listings."
+          error={errors.summary}
+        />
+        <TextArea
+          name="body"
+          label="Content"
+          value={values.body}
+          rows={24}
+          maxlength={LIMITS.docBody}
+          markdown
+          preview={preview}
+          hint="Start sections with ## — the page title is already the main heading. Embed uploaded images with ![alt text](/media/…) (copy the snippet from Media)."
+          error={errors.body}
+        />
+      </div>
+      <div class="card form docs-editor__meta">
+        <Select
+          name="productId"
+          label="Collection"
+          value={values.productId}
+          options={[
+            { value: '', label: 'General documentation' },
+            ...products.map((p) => ({
+              value: String(p.id),
+              label: p.visibility === 'draft' ? `${p.name} (draft product)` : p.name,
+            })),
+          ]}
+          hint="Docs of draft products stay hidden until the product is published."
+          error={errors.productId}
+        />
+        <Field
+          name="slug"
+          label="URL slug"
+          value={values.slug}
+          required
+          mono
+          maxlength={64}
+          hint="e.g. getting-started"
+          error={errors.slug}
+        />
+        <Field
+          name="section"
+          label="Sidebar section"
+          value={values.section}
+          maxlength={LIMITS.section}
+          hint="Groups pages in the sidebar, e.g. “Getting started”."
+          error={errors.section}
+        />
+        <Field
+          name="sortOrder"
+          label="Order"
+          type="number"
+          value={values.sortOrder}
+          required
+          min={-999}
+          max={999}
+          hint="Lower numbers appear first."
+          error={errors.sortOrder}
+        />
+        <Select
+          name="visibility"
+          label="Visibility"
+          required
+          value={values.visibility}
+          options={[
+            { value: 'draft', label: 'Draft' },
+            { value: 'published', label: 'Published' },
+          ]}
+          error={errors.visibility}
+        />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="button button--primary" type="submit" name="intent" value="save">
+        {existing ? 'Save changes' : 'Create page'}
+      </button>
+      <a class="button" href="/staff/docs">
+        Cancel
+      </a>
+      {existing && (
+        <a
+          class="button button--danger form-actions__end"
+          href={`/staff/docs/${existing.id}/delete`}
+        >
+          Delete…
+        </a>
+      )}
+    </div>
+  </form>
+</StaffLayout>
+
+<style>
+  .docs-editor {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .docs-editor .card + .card {
+    margin-top: 0;
+  }
+
+  @media (min-width: 72rem) {
+    .docs-editor {
+      grid-template-columns: minmax(0, 1fr) 20rem;
+    }
+
+    .docs-editor__meta {
+      position: sticky;
+      top: var(--space-5);
+    }
+  }
+</style>

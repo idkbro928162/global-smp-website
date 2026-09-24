@@ -1,0 +1,66 @@
+---
+import AvailabilityBadge from '../../../components/products/AvailabilityBadge.astro';
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { VISIBILITY } from '../../../lib/catalog.ts';
+import { formatDate } from '../../../lib/format.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { listProductsForStaff } from '../../../server/services/products.ts';
+import { requirePermission } from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'products.manage');
+const products = listProductsForStaff(getDb(), actor);
+---
+
+<StaffLayout title="Products">
+  <a slot="actions" class="button button--primary button--small" href="/staff/products/new">
+    New product
+  </a>
+  {products.length === 0 ? (
+    <div class="empty-state">
+      <h2>No products yet</h2>
+      <p>
+        Create a product to list it on the website. Products stay hidden until you set them to
+        Published.
+      </p>
+    </div>
+  ) : (
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption class="visually-hidden">Products</caption>
+        <thead>
+          <tr>
+            <th scope="col">Product</th>
+            <th scope="col">Visibility</th>
+            <th scope="col">Availability</th>
+            <th scope="col">Latest release</th>
+            <th scope="col">BuiltByBit</th>
+            <th scope="col">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr>
+              <td class="data-table__primary">
+                <a href={`/staff/products/${product.id}`}>{product.name}</a>
+                <span class="data-table__secondary mono">/{product.slug}</span>
+              </td>
+              <td>
+                <span
+                  class:list={['badge', { 'badge--positive': product.visibility === 'published' }]}
+                >
+                  {VISIBILITY[product.visibility]}
+                </span>
+              </td>
+              <td>
+                <AvailabilityBadge availability={product.availability} />
+              </td>
+              <td class="mono">{product.latestRelease?.version ?? '—'}</td>
+              <td>{product.builtbybitUrl ? 'Linked' : <span class="subtle">Not set</span>}</td>
+              <td class="nowrap subtle">{formatDate(product.updatedAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</StaffLayout>

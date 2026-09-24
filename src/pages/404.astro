@@ -1,0 +1,43 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Icon from '../components/Icon.astro';
+
+Astro.response.status = 404;
+---
+
+<SiteLayout title="Page not found" noindex>
+  <section class="error-page container" aria-labelledby="error-title">
+    <p class="eyebrow">Error 404</p>
+    <h1 id="error-title">This page doesn’t exist</h1>
+    <p class="muted">
+      The link may be out of date, or the page may have been moved or unpublished.
+    </p>
+    <div class="button-row">
+      <a class="button button--primary" href="/">
+        Go to the homepage
+      </a>
+      <a class="button" href="/products">
+        Browse products <Icon name="arrow-right" class="button__icon" />
+      </a>
+      <a class="button" href="/docs">
+        Documentation
+      </a>
+    </div>
+  </section>
+</SiteLayout>
+
+<style>
+  .error-page {
+    padding-block: clamp(var(--space-8), 12vw, 10rem);
+  }
+
+  h1 {
+    margin-block: var(--space-3) var(--space-4);
+    font-size: var(--text-3xl);
+    font-weight: 800;
+  }
+
+  .button-row {
+    margin-top: var(--space-6);
+  }
+</style>

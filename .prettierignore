@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.astro/
+data/
+coverage/
+test-results/
+playwright-report/
+package-lock.json
+public/fonts/
+brand/source/

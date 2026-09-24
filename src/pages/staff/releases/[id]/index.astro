@@ -1,0 +1,200 @@
+---
+/** Create (/staff/releases/new) or edit (/staff/releases/<id>) a release. */
+import CsrfField from '../../../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../../components/staff/form/Field.astro';
+import Select from '../../../../components/staff/form/Select.astro';
+import TextArea from '../../../../components/staff/form/TextArea.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { RELEASE_CHANNELS } from '../../../../lib/catalog.ts';
+import { renderMarkdown, type SafeHtml } from '../../../../lib/markdown.ts';
+import { LIMITS } from '../../../../lib/validation.ts';
+import { getDb } from '../../../../server/db/client.ts';
+import { todayIso } from '../../../../server/services/common.ts';
+import { listProductOptions } from '../../../../server/services/products.ts';
+import {
+  createRelease,
+  getReleaseForStaff,
+  updateRelease,
+} from '../../../../server/services/releases.ts';
+import {
+  field,
+  mutationContext,
+  parseId,
+  requirePermission,
+  submittedForm,
+} from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'releases.manage');
+const db = getDb();
+const isNew = Astro.params.id === 'new';
+const id = isNew ? null : parseId(Astro.params.id);
+if (!isNew && id === null) return Astro.rewrite('/404');
+
+const existing = id !== null ? getReleaseForStaff(db, actor, id) : null;
+const products = listProductOptions(db, actor);
+const presetProduct = parseId(Astro.url.searchParams.get('product') ?? undefined);
+
+let values = {
+  productId: String(existing?.productId ?? presetProduct ?? ''),
+  version: existing?.version ?? '',
+  channel: existing?.channel ?? 'stable',
+  title: existing?.title ?? '',
+  notes: existing?.notes ?? '',
+  releasedOn: existing?.releasedOn ?? todayIso(),
+  visibility: existing?.visibility ?? 'draft',
+};
+let errors: Record<string, string> = {};
+let preview: SafeHtml | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  values = {
+    productId: field(form, 'productId'),
+    version: field(form, 'version'),
+    channel: field(form, 'channel') as typeof values.channel,
+    title: field(form, 'title'),
+    notes: field(form, 'notes'),
+    releasedOn: field(form, 'releasedOn'),
+    visibility: field(form, 'visibility') as typeof values.visibility,
+  };
+  if (field(form, 'intent') === 'preview') {
+    preview = renderMarkdown(values.notes, { baseLevel: 3 }).html;
+  } else {
+    const ctx = mutationContext(Astro);
+    const result =
+      id === null ? createRelease(db, ctx, values) : updateRelease(db, ctx, id, values);
+    if (result.ok) {
+      return Astro.redirect(
+        `/staff/releases/${result.value.id}?notice=${id === null ? 'created' : 'saved'}`,
+        303,
+      );
+    }
+    errors = result.errors;
+  }
+}
+
+const title = existing ? `${existing.productName} ${existing.version}` : 'New release';
+---
+
+<StaffLayout title={title} back={{ href: '/staff/releases', label: 'Releases' }}>
+  {products.length === 0 ? (
+    <div class="empty-state">
+      <p>
+        Releases belong to a product. <a href="/staff/products/new">Create a product</a> first.
+      </p>
+    </div>
+  ) : (
+    <form method="post" class="form" novalidate>
+      <CsrfField />
+      <button type="submit" name="intent" value="save" hidden tabindex="-1">
+        Save
+      </button>
+      <ErrorSummary
+        errors={errors}
+        labels={{
+          productId: 'Product',
+          version: 'Version',
+          channel: 'Channel',
+          title: 'Title',
+          notes: 'Release notes',
+          releasedOn: 'Release date',
+          visibility: 'Visibility',
+        }}
+      />
+      <div class="card form">
+        <div class="form-row">
+          <Select
+            name="productId"
+            label="Product"
+            required
+            value={values.productId}
+            options={[
+              { value: '', label: 'Choose a product…', disabled: true },
+              ...products.map((p) => ({
+                value: String(p.id),
+                label: p.visibility === 'draft' ? `${p.name} (draft)` : p.name,
+              })),
+            ]}
+            error={errors.productId}
+          />
+          <Field
+            name="version"
+            label="Version"
+            value={values.version}
+            required
+            mono
+            maxlength={LIMITS.version}
+            hint="e.g. 1.4.0 or 2.0.0-beta.1"
+            error={errors.version}
+          />
+        </div>
+        <div class="form-row">
+          <Select
+            name="channel"
+            label="Channel"
+            required
+            value={values.channel}
+            options={Object.entries(RELEASE_CHANNELS).map(([value, label]) => ({ value, label }))}
+            hint="The product's “latest version” prefers stable releases."
+            error={errors.channel}
+          />
+          <Field
+            name="releasedOn"
+            label="Release date"
+            type="date"
+            value={values.releasedOn}
+            required
+            error={errors.releasedOn}
+          />
+        </div>
+        <Field
+          name="title"
+          label="Title"
+          value={values.title}
+          maxlength={LIMITS.shortText}
+          hint="A short summary, e.g. “Folia support”."
+          error={errors.title}
+        />
+        <TextArea
+          name="notes"
+          label="Release notes"
+          value={values.notes}
+          rows={12}
+          maxlength={LIMITS.markdown}
+          markdown
+          preview={preview}
+          error={errors.notes}
+        />
+        <Select
+          name="visibility"
+          label="Visibility"
+          required
+          value={values.visibility}
+          options={[
+            { value: 'draft', label: 'Draft — hidden from the website' },
+            { value: 'published', label: 'Published — visible in the changelog' },
+          ]}
+          hint="Releases of draft products stay hidden until the product is published."
+          error={errors.visibility}
+        />
+      </div>
+      <div class="form-actions">
+        <button class="button button--primary" type="submit" name="intent" value="save">
+          {existing ? 'Save changes' : 'Create release'}
+        </button>
+        <a class="button" href="/staff/releases">
+          Cancel
+        </a>
+        {existing && (
+          <a
+            class="button button--danger form-actions__end"
+            href={`/staff/releases/${existing.id}/delete`}
+          >
+            Delete…
+          </a>
+        )}
+      </div>
+    </form>
+  )}
+</StaffLayout>

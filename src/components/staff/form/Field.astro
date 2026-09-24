@@ -1,0 +1,79 @@
+---
+/**
+ * Labelled input with optional hint and error. The hint and error are wired
+ * to the input with aria-describedby; aria-invalid marks errors.
+ */
+import { fieldId } from './ids.ts';
+
+interface Props {
+  name: string;
+  label: string;
+  value?: string | number | null;
+  type?: 'text' | 'email' | 'url' | 'number' | 'date' | 'password' | 'search';
+  error?: string | undefined;
+  hint?: string;
+  required?: boolean;
+  maxlength?: number;
+  min?: number;
+  max?: number;
+  autocomplete?: string;
+  inputmode?: 'text' | 'numeric' | 'email' | 'url';
+  placeholder?: string;
+  mono?: boolean;
+  id?: string;
+}
+
+const {
+  name,
+  label,
+  value,
+  type = 'text',
+  error,
+  hint,
+  required = false,
+  maxlength,
+  min,
+  max,
+  autocomplete,
+  inputmode,
+  placeholder,
+  mono = false,
+  id = fieldId(name),
+} = Astro.props;
+const hintId = hint ? `${id}-hint` : undefined;
+const errorId = error ? `${id}-error` : undefined;
+const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+---
+
+<div class:list={['field', { 'field--invalid': error }]}>
+  <label for={id}>
+    {label}
+    {!required && <span class="field__optional">optional</span>}
+  </label>
+  {hint && (
+    <p class="field__hint" id={hintId}>
+      {hint}
+    </p>
+  )}
+  <input
+    id={id}
+    name={name}
+    type={type}
+    value={value ?? ''}
+    required={required}
+    maxlength={maxlength}
+    min={min}
+    max={max}
+    autocomplete={autocomplete}
+    inputmode={inputmode}
+    placeholder={placeholder}
+    aria-invalid={error ? 'true' : undefined}
+    aria-describedby={describedBy}
+    class:list={{ mono }}
+  />
+  {error && (
+    <p class="field__error" id={errorId}>
+      {error}
+    </p>
+  )}
+</div>

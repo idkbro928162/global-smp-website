@@ -1,0 +1,44 @@
+---
+/** Shown (via rewrite from the middleware) when the actor lacks a permission. */
+import CsrfField from '../../components/staff/form/CsrfField.astro';
+import StaffLayout from '../../layouts/StaffLayout.astro';
+import { can } from '../../server/auth/authorization.ts';
+
+Astro.response.status = 403;
+const hasPanel = can(Astro.locals.actor, 'panel.access');
+---
+
+<StaffLayout title="Not allowed" chrome={hasPanel}>
+  <div class="card">
+    <p>Your role does not include permission to view this page.</p>
+    {hasPanel ? (
+      <p class="muted">
+        If you need access, ask an administrator to update your role.{' '}
+        <a href="/staff">Back to the dashboard</a>.
+      </p>
+    ) : (
+      <p class="muted">
+        Your account does not currently have access to the staff panel. Contact an administrator if
+        you think this is a mistake.
+      </p>
+    )}
+  </div>
+  {!hasPanel && Astro.locals.session && (
+    <form method="post" action="/staff/logout" class="signout">
+      <CsrfField />
+      <button class="button" type="submit">
+        Sign out
+      </button>
+    </form>
+  )}
+</StaffLayout>
+
+<style>
+  .card > * + * {
+    margin-top: var(--space-3);
+  }
+
+  .signout {
+    margin-top: var(--space-5);
+  }
+</style>

@@ -1,0 +1,6 @@
+---
+/** Hidden CSRF token for the current session; verified by src/middleware.ts on every POST. */
+const token = Astro.locals.session?.csrfToken ?? '';
+---
+
+<input type="hidden" name="_csrf" value={token} />

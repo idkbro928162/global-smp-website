@@ -1,0 +1,56 @@
+---
+import { fieldId } from './ids.ts';
+
+interface Option {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+interface Props {
+  name: string;
+  label: string;
+  options: Option[];
+  value?: string | number | null;
+  error?: string | undefined;
+  hint?: string;
+  required?: boolean;
+}
+
+const { name, label, options, value, error, hint, required = false } = Astro.props;
+const id = fieldId(name);
+const hintId = hint ? `${id}-hint` : undefined;
+const errorId = error ? `${id}-error` : undefined;
+const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+const current = value == null ? '' : String(value);
+---
+
+<div class:list={['field', { 'field--invalid': error }]}>
+  <label for={id}>
+    {label}
+    {!required && <span class="field__optional">optional</span>}
+  </label>
+  {hint && (
+    <p class="field__hint" id={hintId}>
+      {hint}
+    </p>
+  )}
+  <select
+    id={id}
+    name={name}
+    required={required}
+    aria-invalid={error ? 'true' : undefined}
+    aria-describedby={describedBy}
+  >
+    {options.map((option) => (
+      <option value={option.value} selected={option.value === current} disabled={option.disabled}>
+        {option.label}
+      </option>
+    ))}
+  </select>
+  {error && (
+    <p class="field__error" id={errorId}>
+      {error}
+    </p>
+  )}
+</div>

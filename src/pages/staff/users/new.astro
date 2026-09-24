@@ -1,0 +1,93 @@
+---
+import OneTimeLink from '../../../components/staff/OneTimeLink.astro';
+import CsrfField from '../../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../components/staff/form/Field.astro';
+import Select from '../../../components/staff/form/Select.astro';
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { getDb } from '../../../server/db/client.ts';
+import type { IssuedToken } from '../../../server/services/auth.ts';
+import { listRoles } from '../../../server/services/roles.ts';
+import { inviteStaff, roleAssignBlocker } from '../../../server/services/staff-accounts.ts';
+import {
+  field,
+  mutationContext,
+  requirePermission,
+  submittedForm,
+} from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'staff.manage');
+const db = getDb();
+let values = { email: '', displayName: '', roleId: '' };
+let errors: Record<string, string> = {};
+let issued: { link: IssuedToken; email: string } | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  values = {
+    email: field(form, 'email'),
+    displayName: field(form, 'displayName'),
+    roleId: field(form, 'roleId'),
+  };
+  const result = inviteStaff(db, mutationContext(Astro), values);
+  if (result.ok) {
+    issued = { link: result.value.link, email: values.email.trim().toLowerCase() };
+    values = { email: '', displayName: '', roleId: '' };
+  } else {
+    errors = result.errors;
+  }
+}
+
+// Only roles the actor may grant are offered; the service re-checks regardless.
+const roles = listRoles(db, actor).filter((role) => roleAssignBlocker(actor, role) === null);
+---
+
+<StaffLayout title="Invite staff member" back={{ href: '/staff/users', label: 'Staff accounts' }}>
+  {issued && <OneTimeLink link={issued.link} email={issued.email} />}
+  <form method="post" class="form card" novalidate>
+    <CsrfField />
+    <p class="card__intro">
+      The new account stays inactive until the person opens their setup link and chooses a password.
+      No email is sent — you share the link yourself.
+    </p>
+    <ErrorSummary
+      errors={errors}
+      labels={{ email: 'Email', displayName: 'Display name', roleId: 'Role' }}
+    />
+    <Field
+      name="email"
+      label="Email"
+      type="email"
+      value={values.email}
+      required
+      maxlength={254}
+      autocomplete="off"
+      error={errors.email}
+    />
+    <Field
+      name="displayName"
+      label="Display name"
+      value={values.displayName}
+      required
+      maxlength={80}
+      error={errors.displayName}
+    />
+    <Select
+      name="roleId"
+      label="Role"
+      required
+      value={values.roleId}
+      options={[
+        { value: '', label: 'Choose a role…', disabled: true },
+        ...roles.map((role) => ({ value: String(role.id), label: role.name })),
+      ]}
+      hint="You can only assign roles whose permissions you hold yourself."
+      error={errors.roleId}
+    />
+    <div>
+      <button class="button button--primary" type="submit">
+        Create invitation
+      </button>
+    </div>
+  </form>
+</StaffLayout>

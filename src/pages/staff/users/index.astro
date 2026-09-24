@@ -1,0 +1,57 @@
+---
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { formatDateTime } from '../../../lib/format.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { listStaffAccounts } from '../../../server/services/staff-accounts.ts';
+import { requirePermission } from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'staff.manage');
+const accounts = listStaffAccounts(getDb(), actor);
+const STATUS = {
+  active: { label: 'Active', tone: 'badge--positive' },
+  invited: { label: 'Invited', tone: 'badge--pending' },
+  disabled: { label: 'Disabled', tone: 'badge--danger' },
+} as const;
+---
+
+<StaffLayout title="Staff accounts">
+  <a slot="actions" class="button button--primary button--small" href="/staff/users/new">
+    Invite staff member
+  </a>
+  <div class="table-wrap">
+    <table class="data-table">
+      <caption class="visually-hidden">Staff accounts</caption>
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Role</th>
+          <th scope="col">Status</th>
+          <th scope="col">Last sign-in</th>
+        </tr>
+      </thead>
+      <tbody>
+        {accounts.map((account) => (
+          <tr>
+            <td class="data-table__primary">
+              {account.id === actor.id ? (
+                <a href="/staff/account">{account.displayName} (you)</a>
+              ) : (
+                <a href={`/staff/users/${account.id}`}>{account.displayName}</a>
+              )}
+              <span class="data-table__secondary">{account.email}</span>
+            </td>
+            <td>{account.role.name}</td>
+            <td>
+              <span class={`badge ${STATUS[account.status].tone}`}>
+                {STATUS[account.status].label}
+              </span>
+            </td>
+            <td class="nowrap subtle">
+              {account.lastLoginAt ? formatDateTime(account.lastLoginAt) : 'Never'}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</StaffLayout>

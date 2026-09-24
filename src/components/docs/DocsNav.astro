@@ -1,0 +1,93 @@
+---
+import type { DocCollection, DocSection } from '../../server/services/docs.ts';
+
+interface Props {
+  collection: DocCollection;
+  sections: DocSection[];
+  currentSlug?: string;
+}
+
+const { collection, sections, currentSlug } = Astro.props;
+const base = `/docs/${collection.key}`;
+---
+
+<nav class="docs-nav" aria-label={`${collection.title} documentation`}>
+  <a class="docs-nav__collection" href={base} aria-current={currentSlug ? undefined : 'page'}>
+    {collection.title}
+  </a>
+  {sections.map((section) => (
+    <div class="docs-nav__section">
+      {section.title && <p class="docs-nav__heading">{section.title}</p>}
+      <ul>
+        {section.pages.map((page) => (
+          <li>
+            <a
+              href={`${base}/${page.slug}`}
+              aria-current={page.slug === currentSlug ? 'page' : undefined}
+            >
+              {page.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+  <a class="docs-nav__all" href="/docs">
+    All documentation
+  </a>
+</nav>
+
+<style>
+  .docs-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .docs-nav__collection {
+    font-weight: 750;
+    font-size: var(--text-base);
+    text-decoration: none;
+  }
+
+  .docs-nav__heading {
+    margin-bottom: var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    border-left: 1px solid var(--color-border);
+  }
+
+  li a {
+    display: block;
+    margin-left: -1px;
+    padding: 0.4rem var(--space-3);
+    border-left: 2px solid transparent;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    line-height: 1.35;
+  }
+
+  li a:hover {
+    color: var(--color-text);
+  }
+
+  li a[aria-current='page'] {
+    border-left-color: var(--color-text);
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .docs-nav__all {
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+  }
+</style>

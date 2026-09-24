@@ -1,0 +1,122 @@
+---
+import Icon from '../components/Icon.astro';
+import Markdown from '../components/Markdown.astro';
+import PageHeader from '../components/PageHeader.astro';
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { renderMarkdown } from '../lib/markdown.ts';
+import { getDb } from '../server/db/client.ts';
+import { listPublishedOfferings } from '../server/services/offerings.ts';
+import { getContent, getSettings } from '../server/services/site.ts';
+
+const db = getDb();
+const content = getContent(db);
+const settings = getSettings(db);
+const offerings = listPublishedOfferings(db).map((offering) => ({
+  ...offering,
+  rendered: renderMarkdown(offering.body, { baseLevel: 3 }),
+}));
+const intro = renderMarkdown(content['services.intro'], { baseLevel: 2 });
+const discordUrl = settings['links.discord'];
+const email = settings['contact.email'];
+---
+
+<SiteLayout title="Services" description="Minecraft development services from Based Productions.">
+  <PageHeader eyebrow="Services" title="Development services" />
+
+  <div class="container services">
+    {content['services.intro'] && <Markdown html={intro.html} class="services__intro" />}
+
+    {offerings.length > 0 ? (
+      <ul class="offerings">
+        {offerings.map((offering) => (
+          <li class="offering">
+            <h2>{offering.title}</h2>
+            {offering.summary && <p class="offering__summary">{offering.summary}</p>}
+            {offering.body.trim() && <Markdown html={offering.rendered.html} compact />}
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <div class="empty-state">
+        <h2>No services are listed right now</h2>
+        <p>Check back later, or get in touch if you have a project in mind.</p>
+      </div>
+    )}
+
+    {(discordUrl || email) && (
+      <section class="enquiries" aria-labelledby="enquiries-title">
+        <h2 id="enquiries-title">Enquiries</h2>
+        <p class="muted">
+          Talk to us about a project
+          {discordUrl && email
+            ? ' on Discord or by email.'
+            : discordUrl
+              ? ' on Discord.'
+              : ' by email.'}
+        </p>
+        <div class="button-row">
+          {discordUrl && (
+            <a class="button" href={discordUrl}>
+              Discord <Icon name="external" class="button__icon" />
+              <span class="visually-hidden">(external site)</span>
+            </a>
+          )}
+          {email && (
+            <a class="button" href={`mailto:${email}`}>
+              {email}
+            </a>
+          )}
+        </div>
+      </section>
+    )}
+  </div>
+</SiteLayout>
+
+<style>
+  .services {
+    max-width: calc(60rem + 2 * var(--gutter));
+    padding-block: var(--space-7) var(--space-9);
+  }
+
+  /* Rendered by the Markdown component, so outside this file's style scope. */
+  .services :global(.services__intro) {
+    margin-bottom: var(--space-7);
+  }
+
+  .offerings {
+    display: grid;
+    gap: var(--space-5);
+    list-style: none;
+    padding: 0;
+  }
+
+  .offering {
+    padding: var(--space-6);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+
+  .offering h2 {
+    font-size: var(--text-xl);
+  }
+
+  .offering__summary {
+    margin-block: var(--space-2) var(--space-4);
+    color: var(--color-text-muted);
+  }
+
+  .enquiries {
+    margin-top: var(--space-8);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .enquiries h2 {
+    font-size: var(--text-xl);
+  }
+
+  .enquiries .muted {
+    margin-block: var(--space-2) var(--space-4);
+  }
+</style>

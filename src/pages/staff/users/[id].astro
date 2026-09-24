@@ -1,0 +1,213 @@
+---
+import OneTimeLink from '../../../components/staff/OneTimeLink.astro';
+import CsrfField from '../../../components/staff/form/CsrfField.astro';
+import Select from '../../../components/staff/form/Select.astro';
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { formatDateTime } from '../../../lib/format.ts';
+import { getDb } from '../../../server/db/client.ts';
+import type { IssuedToken } from '../../../server/services/auth.ts';
+import { listRoles } from '../../../server/services/roles.ts';
+import {
+  accountManageBlocker,
+  changeStaffRole,
+  deleteInvitedAccount,
+  getStaffAccount,
+  issueStaffLink,
+  revokeStaffSessions,
+  roleAssignBlocker,
+  setStaffDisabled,
+} from '../../../server/services/staff-accounts.ts';
+import {
+  field,
+  mutationContext,
+  parseId,
+  requirePermission,
+  submittedForm,
+} from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'staff.manage');
+const db = getDb();
+const id = parseId(Astro.params.id);
+if (id === null) return Astro.rewrite('/404');
+if (id === actor.id) return Astro.redirect('/staff/account');
+
+let errors: Record<string, string> = {};
+let issued: IssuedToken | null = null;
+let message: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  const ctx = mutationContext(Astro);
+  const intent = field(form, 'intent');
+  if (intent === 'role') {
+    const result = changeStaffRole(db, ctx, id, field(form, 'roleId'));
+    if (result.ok) return Astro.redirect(`/staff/users/${id}?notice=saved`, 303);
+    errors = result.errors;
+  } else if (intent === 'disable' || intent === 'enable') {
+    const result = setStaffDisabled(db, ctx, id, intent === 'disable');
+    if (result.ok) return Astro.redirect(`/staff/users/${id}?notice=saved`, 303);
+    errors = result.errors;
+  } else if (intent === 'link') {
+    const result = issueStaffLink(db, ctx, id);
+    if (result.ok) issued = result.value;
+    else errors = result.errors;
+  } else if (intent === 'sessions') {
+    const revoked = revokeStaffSessions(db, ctx, id);
+    message = `Signed out ${revoked} session${revoked === 1 ? '' : 's'}.`;
+  } else if (intent === 'delete-invite') {
+    const result = deleteInvitedAccount(db, ctx, id);
+    if (result.ok) return Astro.redirect('/staff/users?notice=deleted', 303);
+    errors = result.errors;
+  }
+}
+
+const account = getStaffAccount(db, actor, id);
+const blocker = accountManageBlocker(actor, account);
+const roles = listRoles(db, actor).filter((role) => roleAssignBlocker(actor, role) === null);
+const STATUS_LABEL = {
+  active: 'Active',
+  invited: 'Invited (setup not completed)',
+  disabled: 'Disabled',
+};
+---
+
+<StaffLayout title={account.displayName} back={{ href: '/staff/users', label: 'Staff accounts' }}>
+  {issued && <OneTimeLink link={issued} email={account.email} />}
+  {message && (
+    <div class="notice notice--success staff-notice" role="status">
+      {message}
+    </div>
+  )}
+  {errors._form && (
+    <div class="notice notice--danger staff-notice" role="alert">
+      {errors._form}
+    </div>
+  )}
+
+  <div class="stack account-detail">
+    <section class="card">
+      <dl class="kv">
+        <dt>Email</dt>
+        <dd>{account.email}</dd>
+        <dt>Role</dt>
+        <dd>{account.role.name}</dd>
+        <dt>Status</dt>
+        <dd>{STATUS_LABEL[account.status]}</dd>
+        <dt>Last sign-in</dt>
+        <dd>{account.lastLoginAt ? formatDateTime(account.lastLoginAt) : 'Never'}</dd>
+        <dt>Active sessions</dt>
+        <dd>{account.activeSessions}</dd>
+        <dt>Pending link</dt>
+        <dd>{account.hasPendingLink ? 'Yes (unused, not expired)' : 'No'}</dd>
+      </dl>
+    </section>
+
+    {blocker ? (
+      <p class="notice notice--info">{blocker}</p>
+    ) : (
+      <>
+        <section class="card" aria-labelledby="role-title">
+          <h2 id="role-title">Role</h2>
+          <form method="post" class="form">
+            <CsrfField />
+            <input type="hidden" name="intent" value="role" />
+            <Select
+              name="roleId"
+              label="Role"
+              required
+              value={String(account.role.id)}
+              options={roles.map((role) => ({ value: String(role.id), label: role.name }))}
+              hint="Permission changes take effect on their next request."
+              error={errors.roleId}
+            />
+            <div>
+              <button class="button" type="submit">
+                Change role
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card" aria-labelledby="access-title">
+          <h2 id="access-title">Access</h2>
+          <div class="actions">
+            {account.status !== 'disabled' && (
+              <form method="post">
+                <CsrfField />
+                <input type="hidden" name="intent" value="link" />
+                <button class="button" type="submit">
+                  {account.status === 'invited' ? 'New setup link' : 'Create password reset link'}
+                </button>
+              </form>
+            )}
+            {account.activeSessions > 0 && (
+              <form method="post">
+                <CsrfField />
+                <input type="hidden" name="intent" value="sessions" />
+                <button class="button" type="submit">
+                  Sign out everywhere
+                </button>
+              </form>
+            )}
+          </div>
+          <p class="card__intro note">
+            A new link replaces any earlier unused link. Reset links do not change the password
+            until they are used.
+          </p>
+        </section>
+
+        <section class="card card--danger" aria-labelledby="danger-title">
+          <h2 id="danger-title">Disable or remove</h2>
+          <div class="actions">
+            {account.status === 'disabled' ? (
+              <form method="post">
+                <CsrfField />
+                <input type="hidden" name="intent" value="enable" />
+                <button class="button" type="submit">
+                  Re-enable account
+                </button>
+              </form>
+            ) : (
+              <form method="post">
+                <CsrfField />
+                <input type="hidden" name="intent" value="disable" />
+                <button class="button button--danger" type="submit">
+                  Disable account
+                </button>
+              </form>
+            )}
+            {account.status === 'invited' && (
+              <form method="post">
+                <CsrfField />
+                <input type="hidden" name="intent" value="delete-invite" />
+                <button class="button button--danger" type="submit">
+                  Delete invitation
+                </button>
+              </form>
+            )}
+          </div>
+          <p class="card__intro note">
+            Disabling signs the account out immediately and blocks sign-in. The audit history is
+            kept.
+          </p>
+        </section>
+      </>
+    )}
+  </div>
+</StaffLayout>
+
+<style>
+  .account-detail {
+    max-width: 44rem;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .note {
+    margin: var(--space-4) 0 0;
+  }
+</style>

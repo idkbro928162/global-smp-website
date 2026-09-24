@@ -1,0 +1,32 @@
+---
+import ConfirmDelete from '../../../../components/staff/ConfirmDelete.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { getDb } from '../../../../server/db/client.ts';
+import { deleteDocPage, getDocPageForStaff } from '../../../../server/services/docs.ts';
+import { mutationContext, parseId, requirePermission } from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'docs.manage');
+const db = getDb();
+const id = parseId(Astro.params.id);
+if (id === null) return Astro.rewrite('/404');
+const page = getDocPageForStaff(db, actor, id);
+
+if (Astro.request.method === 'POST') {
+  deleteDocPage(db, mutationContext(Astro), id);
+  return Astro.redirect('/staff/docs?notice=deleted', 303);
+}
+---
+
+<StaffLayout
+  title="Delete documentation page"
+  back={{ href: `/staff/docs/${id}`, label: page.title }}
+>
+  <ConfirmDelete
+    subject={page.title}
+    cancelHref={`/staff/docs/${id}`}
+    consequences={[
+      'The page is removed from the website immediately and links to it will break.',
+      'Consider setting it to Draft instead if you may need it again.',
+    ]}
+  />
+</StaffLayout>

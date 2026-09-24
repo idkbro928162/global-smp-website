@@ -1,0 +1,104 @@
+---
+/**
+ * Product artwork, or — when none has been uploaded — an intentional
+ * placeholder in the product's accent colour. Never a stock image.
+ */
+import type { AccentKey } from '../../lib/catalog.ts';
+import type { MediaItem } from '../../server/services/media.ts';
+
+interface Props {
+  name: string;
+  accent: AccentKey;
+  artwork: MediaItem | null;
+  /** Rendered size hint for the browser's srcset selection. */
+  sizes?: string;
+  eager?: boolean;
+}
+
+const {
+  name,
+  accent,
+  artwork,
+  sizes = '(min-width: 64rem) 30vw, (min-width: 40rem) 45vw, 100vw',
+  eager = false,
+} = Astro.props;
+const smallWidth = artwork ? Math.min(640, artwork.width) : 0;
+---
+
+<div class:list={['artwork', `accent-${accent}`]}>
+  {artwork ? (
+    <img
+      src={artwork.url}
+      srcset={`${artwork.smallUrl} ${smallWidth}w, ${artwork.url} ${artwork.width}w`}
+      sizes={sizes}
+      width={artwork.width}
+      height={artwork.height}
+      alt={artwork.alt}
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+    />
+  ) : (
+    <div class="artwork__placeholder" aria-hidden="true">
+      <span>{name}</span>
+    </div>
+  )}
+</div>
+
+<style>
+  .artwork {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--accent-deep, var(--color-surface-2));
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .artwork img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .artwork__placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: var(--space-4);
+    /* A faint 16px block grid, fading towards the bottom-left. */
+    background-image:
+      linear-gradient(to top right, var(--accent-deep) 20%, transparent 75%),
+      linear-gradient(color-mix(in srgb, var(--accent) 16%, transparent) 1px, transparent 1px),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--accent) 16%, transparent) 1px,
+        transparent 1px
+      );
+    background-size:
+      100% 100%,
+      16px 16px,
+      16px 16px;
+  }
+
+  .artwork__placeholder::before {
+    content: '';
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+  }
+
+  .artwork__placeholder span {
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--accent) 70%, var(--color-text));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>

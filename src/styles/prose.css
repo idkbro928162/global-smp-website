@@ -1,0 +1,251 @@
+/*
+ * Typography for rendered Markdown (docs, product descriptions, release
+ * notes, copy blocks) and highlight.js token colours.
+ */
+.prose {
+  --prose-gap: 1.1em;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  line-height: 1.7;
+  max-width: 72ch;
+}
+
+.prose > * + * {
+  margin-top: var(--prose-gap);
+}
+
+.prose--compact {
+  font-size: var(--text-base);
+  --prose-gap: 0.8em;
+}
+
+.prose :where(h2, h3, h4) {
+  scroll-margin-top: calc(var(--header-height) + var(--space-4));
+}
+
+.prose h2 {
+  font-size: var(--text-xl);
+  margin-top: 2em;
+}
+
+.prose h3 {
+  font-size: var(--text-lg);
+  margin-top: 1.75em;
+}
+
+.prose h4 {
+  font-size: var(--text-md);
+  margin-top: 1.5em;
+}
+
+.prose :where(h2, h3, h4) + * {
+  margin-top: 0.6em;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose .heading-anchor {
+  color: inherit;
+  text-decoration: none;
+}
+
+.prose .heading-anchor:hover::after,
+.prose .heading-anchor:focus-visible::after {
+  content: ' #';
+  color: var(--color-text-subtle);
+  font-weight: 400;
+}
+
+.prose a:not(.heading-anchor) {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-decoration-color: var(--color-text-subtle);
+}
+
+.prose a:not(.heading-anchor):hover {
+  text-decoration-color: var(--color-text);
+}
+
+.prose :where(ul, ol) {
+  padding-left: 1.4em;
+}
+
+.prose li + li {
+  margin-top: 0.35em;
+}
+
+.prose ul > li::marker {
+  color: var(--color-text-subtle);
+}
+
+.prose strong {
+  font-weight: 700;
+}
+
+.prose blockquote {
+  padding: var(--space-3) var(--space-5);
+  border-left: 3px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin-block: 2em;
+}
+
+.prose img {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.prose :not(pre) > code {
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  font-size: 0.85em;
+  white-space: break-spaces;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.prose :where(th, td) {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th {
+  background: var(--color-surface);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.prose tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ---------------------------------------------------------- code blocks */
+
+.code-block {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-raised);
+  overflow: hidden;
+}
+
+.code-block__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 2.25rem;
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.code-block__lang {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+  text-transform: lowercase;
+}
+
+.code-block__copy {
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.code-block__copy:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.code-block pre {
+  margin: 0;
+  padding: var(--space-4);
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+.code-block pre:focus-visible {
+  outline-offset: -2px;
+}
+
+/* highlight.js tokens — a restrained palette tuned for the graphite surface. */
+.hljs-comment,
+.hljs-quote {
+  color: #8a8983;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-built_in {
+  color: #f0a988;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #a5d6a7;
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: #e8c77a;
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-property {
+  color: #9ccfe8;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name {
+  color: #f2f1ec;
+  font-weight: 600;
+}
+.hljs-type,
+.hljs-title.class_ {
+  color: #c9b3f5;
+}
+.hljs-meta,
+.hljs-doctag {
+  color: #b5b3ad;
+}
+.hljs-deletion {
+  color: #ff9d96;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 700;
+}

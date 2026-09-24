@@ -1,0 +1,43 @@
+---
+/**
+ * Minimal inline icon set (24px grid, 1.75px strokes). Icons are decorative:
+ * always pair them with visible or visually-hidden text.
+ */
+const PATHS = {
+  'arrow-right': 'M5 12h14M13 6l6 6-6 6',
+  'arrow-left': 'M19 12H5M11 18l-6-6 6-6',
+  external: 'M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4',
+  menu: 'M4 7h16M4 12h16M4 17h16',
+  close: 'M6 6l12 12M18 6L6 18',
+  check: 'M5 12.5l4.5 4.5L19 7',
+  chevron: 'M9 6l6 6-6 6',
+  book: 'M5 5.5A1.5 1.5 0 0 1 6.5 4H19v14H6.5A1.5 1.5 0 0 0 5 19.5v-14zM5 19.5A1.5 1.5 0 0 0 6.5 21H19',
+  chat: 'M5 5h14v10H9l-4 4V5z',
+  bag: 'M6 8h12l-1 12H7L6 8zM9 8V6a3 3 0 0 1 6 0v2',
+  plus: 'M12 5v14M5 12h14',
+} as const;
+
+interface Props {
+  name: keyof typeof PATHS;
+  size?: number;
+  class?: string;
+}
+
+const { name, size = 16, class: className } = Astro.props;
+---
+
+<svg
+  class:list={['icon', className]}
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.75"
+  stroke-linecap="square"
+  stroke-linejoin="miter"
+  aria-hidden="true"
+  focusable="false"
+>
+  <path d={PATHS[name]}></path>
+</svg>

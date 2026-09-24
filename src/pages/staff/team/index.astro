@@ -1,0 +1,63 @@
+---
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { VISIBILITY } from '../../../lib/catalog.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { listTeamForStaff } from '../../../server/services/team.ts';
+import { requirePermission } from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'team.manage');
+const members = listTeamForStaff(getDb(), actor);
+---
+
+<StaffLayout title="Team page">
+  <a slot="actions" class="button button--primary button--small" href="/staff/team/new">
+    New profile
+  </a>
+  <p class="intro muted">
+    Public profiles shown on the <a href="/about#team">About</a> page. These are separate from staff
+    accounts: a profile does not grant access to this panel.
+  </p>
+  {members.length === 0 ? (
+    <div class="empty-state">
+      <p>No team profiles yet.</p>
+    </div>
+  ) : (
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption class="visually-hidden">Team profiles</caption>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Order</th>
+            <th scope="col">Visibility</th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.map((member) => (
+            <tr>
+              <td class="data-table__primary">
+                <a href={`/staff/team/${member.id}`}>{member.name}</a>
+                {member.roleTitle && <span class="data-table__secondary">{member.roleTitle}</span>}
+              </td>
+              <td class="mono">{member.sortOrder}</td>
+              <td>
+                <span
+                  class:list={['badge', { 'badge--positive': member.visibility === 'published' }]}
+                >
+                  {VISIBILITY[member.visibility]}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</StaffLayout>
+
+<style>
+  .intro {
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+  }
+</style>

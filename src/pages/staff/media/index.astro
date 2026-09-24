@@ -1,0 +1,133 @@
+---
+import CsrfField from '../../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../components/staff/form/Field.astro';
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { formatBytes, formatDate } from '../../../lib/format.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { MAX_UPLOAD_BYTES, listMedia, uploadImage } from '../../../server/services/media.ts';
+import {
+  field,
+  mutationContext,
+  requirePermission,
+  submittedForm,
+} from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'media.manage');
+const db = getDb();
+let errors: Record<string, string> = {};
+let alt = '';
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  alt = field(form, 'alt');
+  const result = await uploadImage(db, mutationContext(Astro), form.get('file'), alt);
+  if (result.ok) return Astro.redirect(`/staff/media/${result.value.id}?notice=uploaded`, 303);
+  errors = result.errors;
+  Astro.response.status = 422;
+}
+
+const media = listMedia(db, actor);
+---
+
+<StaffLayout title="Media">
+  <section class="card" aria-labelledby="upload-title">
+    <h2 id="upload-title">Upload an image</h2>
+    <form method="post" enctype="multipart/form-data" class="form" novalidate>
+      <CsrfField />
+      <ErrorSummary errors={errors} labels={{ file: 'Image', alt: 'Alt text' }} />
+      <div class:list={['field', { 'field--invalid': errors.file }]}>
+        <label for="field-file">Image</label>
+        <p class="field__hint" id="field-file-hint">
+          PNG, JPEG, WebP, GIF or AVIF, up to {formatBytes(MAX_UPLOAD_BYTES)}. Images are re-encoded
+          to WebP and metadata (such as location) is removed. Uploaded images are public.
+        </p>
+        <input
+          id="field-file"
+          type="file"
+          name="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+          required
+          aria-describedby={errors.file ? 'field-file-hint field-file-error' : 'field-file-hint'}
+          aria-invalid={errors.file ? 'true' : undefined}
+        />
+        {errors.file && (
+          <p class="field__error" id="field-file-error">
+            {errors.file}
+          </p>
+        )}
+      </div>
+      <Field
+        name="alt"
+        label="Alt text"
+        value={alt}
+        maxlength={300}
+        hint="Describe the image for people who cannot see it. Leave empty only for purely decorative images."
+        error={errors.alt}
+      />
+      <div>
+        <button class="button button--primary" type="submit">
+          Upload
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="library" aria-labelledby="library-title">
+    <h2 id="library-title">
+      Library <span class="subtle mono">{media.length}</span>
+    </h2>
+    {media.length === 0 ? (
+      <div class="empty-state">
+        <p>No images uploaded yet.</p>
+      </div>
+    ) : (
+      <ul class="media-grid">
+        {media.map((item) => (
+          <li class="media-option">
+            <img
+              src={item.smallUrl}
+              alt=""
+              width="320"
+              height="200"
+              loading="lazy"
+              decoding="async"
+            />
+            <a class="media-option__label" href={`/staff/media/${item.id}`}>
+              <span>{item.alt || item.originalName}</span>
+            </a>
+            <span class="media-meta subtle">
+              {item.width}×{item.height} · {formatDate(item.createdAt)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+</StaffLayout>
+
+<style>
+  .library {
+    margin-top: var(--space-7);
+  }
+
+  .library h2 {
+    margin-bottom: var(--space-4);
+    font-size: var(--text-lg);
+  }
+
+  .library h2 .mono {
+    font-size: var(--text-sm);
+    font-weight: 400;
+  }
+
+  .media-meta {
+    padding: 0 var(--space-2) var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .media-grid {
+    list-style: none;
+    padding: 0;
+  }
+</style>

@@ -1,0 +1,83 @@
+---
+/**
+ * Chooses one image (radio buttons, with a "None" option) or several
+ * (checkboxes) from the media library. Works without JavaScript.
+ */
+import type { MediaItem } from '../../../server/services/media.ts';
+import { fieldId } from './ids.ts';
+
+interface Props {
+  name: string;
+  legend: string;
+  media: MediaItem[];
+  selected: readonly string[];
+  multiple?: boolean;
+  hint?: string;
+  error?: string | undefined;
+}
+
+const { name, legend, media, selected, multiple = false, hint, error } = Astro.props;
+const id = fieldId(name);
+const hintId = hint ? `${id}-hint` : undefined;
+const errorId = error ? `${id}-error` : undefined;
+const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+const type = multiple ? 'checkbox' : 'radio';
+---
+
+<fieldset
+  class:list={['field', { 'field--invalid': error }]}
+  id={id}
+  aria-describedby={describedBy}
+>
+  <legend>{legend}</legend>
+  {hint && (
+    <p class="field__hint" id={hintId}>
+      {hint}
+    </p>
+  )}
+  {media.length === 0 ? (
+    <p class="field__hint">
+      The media library is empty. <a href="/staff/media">Upload an image</a> first, then come back.
+    </p>
+  ) : (
+    <div class="media-grid">
+      {!multiple && (
+        <label class="media-option">
+          <span class="media-option__none" aria-hidden="true">
+            —
+          </span>
+          <span class="media-option__label">
+            <input
+              type="radio"
+              name={name}
+              value=""
+              checked={selected.length === 0 || selected[0] === ''}
+            />
+            <span>None</span>
+          </span>
+        </label>
+      )}
+      {media.map((item) => (
+        <label class="media-option">
+          <img
+            src={item.smallUrl}
+            alt=""
+            width="320"
+            height="200"
+            loading="lazy"
+            decoding="async"
+          />
+          <span class="media-option__label">
+            <input type={type} name={name} value={item.id} checked={selected.includes(item.id)} />
+            <span title={item.originalName}>{item.alt || item.originalName}</span>
+          </span>
+        </label>
+      ))}
+    </div>
+  )}
+  {error && (
+    <p class="field__error" id={errorId}>
+      {error}
+    </p>
+  )}
+</fieldset>

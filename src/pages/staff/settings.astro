@@ -1,0 +1,71 @@
+---
+import CsrfField from '../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../components/staff/form/ErrorSummary.astro';
+import Field from '../../components/staff/form/Field.astro';
+import StaffLayout from '../../layouts/StaffLayout.astro';
+import { SETTINGS, type SettingKey } from '../../lib/site-registry.ts';
+import { getDb } from '../../server/db/client.ts';
+import { getSettings, updateSettings } from '../../server/services/site.ts';
+import {
+  field,
+  mutationContext,
+  requirePermission,
+  submittedForm,
+} from '../../server/staff/page.ts';
+
+requirePermission(Astro, 'settings.manage');
+const db = getDb();
+const keys = Object.keys(SETTINGS) as SettingKey[];
+let values: Record<string, string> = getSettings(db);
+let errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  values = Object.fromEntries(keys.map((key) => [key, field(form, key)]));
+  const result = updateSettings(db, mutationContext(Astro), values);
+  if (result.ok) return Astro.redirect('/staff/settings?notice=saved', 303);
+  errors = result.errors;
+}
+
+const labels = Object.fromEntries(keys.map((key) => [key, SETTINGS[key].label]));
+---
+
+<StaffLayout title="Site settings">
+  <p class="intro muted">
+    Links used across the public site. Leave a field empty to hide it — the site shows a neutral
+    “not yet available” note instead of a placeholder link. Links are checked to point at the
+    expected service.
+  </p>
+  <form method="post" class="form card" novalidate>
+    <CsrfField />
+    <ErrorSummary errors={errors} labels={labels} />
+    {keys.map((key) => {
+      const definition = SETTINGS[key];
+      const hosts = 'hosts' in definition ? definition.hosts : undefined;
+      return (
+        <Field
+          name={key}
+          label={definition.label}
+          type={definition.kind === 'email' ? 'email' : 'url'}
+          value={values[key]}
+          maxlength={500}
+          hint={`${definition.description}${hosts ? ` Must be an https link to ${hosts.join(' or ')}.` : ''}`}
+          error={errors[key]}
+        />
+      );
+    })}
+    <div class="form-actions">
+      <button class="button button--primary" type="submit">
+        Save settings
+      </button>
+    </div>
+  </form>
+</StaffLayout>
+
+<style>
+  .intro {
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+    max-width: 48rem;
+  }
+</style>

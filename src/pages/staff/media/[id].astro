@@ -1,0 +1,145 @@
+---
+import CsrfField from '../../../components/staff/form/CsrfField.astro';
+import Field from '../../../components/staff/form/Field.astro';
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { formatBytes, formatDateTime } from '../../../lib/format.ts';
+import { NotFoundError } from '../../../server/auth/authorization.ts';
+import { getDb } from '../../../server/db/client.ts';
+import {
+  deleteMedia,
+  findMediaUsage,
+  getMediaItems,
+  updateMediaAlt,
+} from '../../../server/services/media.ts';
+import {
+  field,
+  mutationContext,
+  requirePermission,
+  submittedForm,
+} from '../../../server/staff/page.ts';
+
+requirePermission(Astro, 'media.manage');
+const db = getDb();
+const id = Astro.params.id ?? '';
+const item = getMediaItems(db, [id]).get(id);
+if (!item) throw new NotFoundError();
+
+let errors: Record<string, string> = {};
+let alt = item.alt;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  const ctx = mutationContext(Astro);
+  if (field(form, 'intent') === 'delete') {
+    const result = await deleteMedia(db, ctx, id);
+    if (result.ok) return Astro.redirect('/staff/media?notice=deleted', 303);
+    errors = result.errors;
+  } else {
+    alt = field(form, 'alt');
+    const result = updateMediaAlt(db, ctx, id, alt);
+    if (result.ok) return Astro.redirect(`/staff/media/${id}?notice=saved`, 303);
+    errors = result.errors;
+  }
+}
+
+const usage = findMediaUsage(db, id);
+const snippet = `![${alt || 'Describe the image'}](${item.url})`;
+---
+
+<StaffLayout title={item.originalName} back={{ href: '/staff/media', label: 'Media' }}>
+  {errors._form && (
+    <div class="notice notice--danger staff-notice" role="alert">
+      {errors._form}
+    </div>
+  )}
+  <div class="media-detail">
+    <figure class="media-detail__preview">
+      <img src={item.url} alt={item.alt} width={item.width} height={item.height} />
+    </figure>
+    <div class="stack">
+      <section class="card">
+        <dl class="kv">
+          <dt>Size</dt>
+          <dd>
+            {item.width}×{item.height} · {formatBytes(item.bytes)}
+          </dd>
+          <dt>Uploaded</dt>
+          <dd>{formatDateTime(item.createdAt)}</dd>
+          <dt>URL</dt>
+          <dd>
+            <code>{item.url}</code>
+          </dd>
+          <dt>Used by</dt>
+          <dd>{usage.length > 0 ? usage.join('; ') : 'Not used'}</dd>
+        </dl>
+      </section>
+      <section class="card" aria-labelledby="alt-title">
+        <h2 id="alt-title">Alt text</h2>
+        <form method="post" class="form" novalidate>
+          <CsrfField />
+          <input type="hidden" name="intent" value="alt" />
+          <Field name="alt" label="Alt text" value={alt} maxlength={300} error={errors.alt} />
+          <div>
+            <button class="button" type="submit">
+              Save alt text
+            </button>
+          </div>
+        </form>
+      </section>
+      <section class="card" aria-labelledby="embed-title">
+        <h2 id="embed-title">Use in Markdown</h2>
+        <p class="card__intro">Paste into documentation, descriptions or release notes:</p>
+        <code class="link-box">{snippet}</code>
+      </section>
+      <section class="card card--danger" aria-labelledby="delete-title">
+        <h2 id="delete-title">Delete image</h2>
+        {usage.length > 0 ? (
+          <p class="muted">This image is in use and cannot be deleted until it is removed there.</p>
+        ) : (
+          <form method="post">
+            <CsrfField />
+            <input type="hidden" name="intent" value="delete" />
+            <p class="card__intro">Deleting removes the file permanently.</p>
+            <button class="button button--danger" type="submit">
+              Delete image
+            </button>
+          </form>
+        )}
+      </section>
+    </div>
+  </div>
+</StaffLayout>
+
+<style>
+  .media-detail {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .media-detail__preview {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: repeating-conic-gradient(var(--color-surface) 0 25%, var(--color-surface-2) 0 50%) 0
+      0 / 16px 16px;
+    overflow: hidden;
+  }
+
+  .media-detail__preview img {
+    width: 100%;
+  }
+
+  .stack > .card + .card {
+    margin-top: var(--space-5);
+  }
+
+  .muted {
+    font-size: var(--text-sm);
+  }
+
+  @media (min-width: 64rem) {
+    .media-detail {
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+  }
+</style>
