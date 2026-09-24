@@ -9,6 +9,7 @@ import {
 import {
   SESSION_ABSOLUTE_TIMEOUT_MS,
   SESSION_IDLE_TIMEOUT_MS,
+  countUserSessions,
   createSession,
   resolveSession,
   revokeUserSessions,
@@ -31,6 +32,18 @@ describe('passwords', () => {
     expect(a.startsWith('scrypt$17$8$1$')).toBe(true);
     expect(await verifyPassword('correct horse battery', a)).toBe(true);
     expect(await verifyPassword('correct horse batterx', a)).toBe(false);
+  });
+
+  it('completes many concurrent hashes correctly (bounded concurrency, no deadlock)', async () => {
+    const passwords = Array.from({ length: 6 }, (_, i) => `concurrent passphrase ${i}`);
+    const hashes = await Promise.all(passwords.map((p) => hashPassword(p)));
+    const checks = await Promise.all(
+      passwords.map((p, i) => verifyPassword(p, hashes[(i + 1) % hashes.length]!)),
+    );
+    expect(checks.every((ok) => ok === false)).toBe(true);
+    expect(await Promise.all(passwords.map((p, i) => verifyPassword(p, hashes[i]!)))).toEqual(
+      passwords.map(() => true),
+    );
   });
 
   it('treats missing or malformed hashes as a failed verification', async () => {
@@ -113,6 +126,18 @@ describe('sessions', () => {
     const { token } = createSession(db, actor.id, {});
     db.update(users).set({ status: 'disabled' }).where(eq(users.id, actor.id)).run();
     expect(resolveSession(db, token)).toBeNull();
+  });
+
+  it('counts only live sessions', () => {
+    // Regression: expired/idle sessions awaiting cleanup were counted as active.
+    const actor = makeActor(db, ['panel.access']);
+    const start = new Date('2026-01-01T00:00:00Z');
+    createSession(db, actor.id, {}, start);
+    createSession(db, actor.id, {}, start);
+    expect(countUserSessions(db, actor.id, start)).toBe(2);
+    const later = new Date(start.getTime() + SESSION_IDLE_TIMEOUT_MS + 1);
+    createSession(db, actor.id, {}, later);
+    expect(countUserSessions(db, actor.id, later)).toBe(1);
   });
 
   it('revokes all other sessions but keeps the current one', () => {

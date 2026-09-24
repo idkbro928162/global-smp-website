@@ -23,6 +23,7 @@ const root = path.resolve(import.meta.dirname, '../..');
 const SOURCE = path.join(root, 'brand/source/based-productions-logo-original.webp');
 const OUT = path.join(root, 'public/brand');
 const PUBLIC = path.join(root, 'public');
+const ASSETS = path.join(root, 'src/assets/brand');
 
 // Must match --color-text / --color-bg in src/styles/tokens.css.
 const OFF_WHITE = { r: 0xf2, g: 0xf1, b: 0xec };
@@ -121,6 +122,14 @@ async function main() {
   await rgba(OFF_WHITE).png({ compressionLevel: 9 }).toFile(path.join(OUT, 'wordmark-light.png'));
   await rgba(OFF_WHITE).webp({ lossless: true }).toFile(path.join(OUT, 'wordmark-light.webp'));
   await rgba(INK).png({ compressionLevel: 9 }).toFile(path.join(OUT, 'wordmark-dark.png'));
+  // Small variant for the site header/footer (≤ ~107 CSS px wide, so 320 px covers 3× screens).
+  // Imported by src/components/Wordmark.astro, so it gets a hashed, immutable URL.
+  await mkdir(ASSETS, { recursive: true });
+  // A 16-colour palette PNG is ~4× smaller than WebP for this flat two-tone mark.
+  await rgba(OFF_WHITE)
+    .resize({ width: 320 })
+    .png({ palette: true, colors: 16, compressionLevel: 9 })
+    .toFile(path.join(ASSETS, 'wordmark-light-320.png'));
 
   // Icons: the unaltered wordmark on the logo's own paper-white square.
   const iconPng = async (size: number, padRatio: number) => {

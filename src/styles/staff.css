@@ -179,6 +179,10 @@
   margin-bottom: var(--space-6);
 }
 
+.staff-page-header > div {
+  min-width: 0;
+}
+
 .staff-page-header h1 {
   font-size: var(--text-2xl);
   font-weight: 800;
@@ -203,6 +207,11 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   text-decoration: none;
+}
+
+.staff-back span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .staff-back:hover {
@@ -279,6 +288,7 @@
 
 .form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   max-width: 48rem;
 }
@@ -289,6 +299,7 @@
 
 .form-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
 }
 
@@ -423,6 +434,7 @@
 
 .choices__list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
@@ -659,11 +671,13 @@
 
 .feature-rows {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
 .feature-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--color-border);

@@ -156,6 +156,7 @@ const description = page.summary || markdownToText(page.body) || undefined;
 <style>
   .docs-layout {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-5);
     padding-block: var(--space-5) var(--space-9);
   }

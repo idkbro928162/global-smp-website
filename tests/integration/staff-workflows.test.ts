@@ -85,6 +85,16 @@ describe('content workflow', () => {
     const audit = await (await owner.get('/staff/audit?action=product.')).text();
     expect(audit).toContain('product.create');
     expect(audit).toContain('editor@example.test');
+    // The filter shows only matching actions (third column of each row).
+    const actions = [
+      ...audit.matchAll(
+        /<tr[^>]*>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td class="mono"[^>]*>([^<]+)<\/td>/g,
+      ),
+    ].map((m) => m[1]);
+    expect(actions.length).toBeGreaterThan(0);
+    expect(actions.every((a) => a?.startsWith('product.'))).toBe(true);
+    // Filter input is sanitised rather than interpolated into SQL.
+    expect((await owner.get('/staff/audit?action=%27%20OR%201%3D1--')).status).toBe(200);
   });
 });
 

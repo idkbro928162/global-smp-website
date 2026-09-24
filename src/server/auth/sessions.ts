@@ -8,7 +8,7 @@
  *   disabling an account or changing a role takes effect immediately.
  * - Each session carries its own CSRF token (see security/request-guard.ts).
  */
-import { and, eq, lt, ne, or } from 'drizzle-orm';
+import { and, eq, gt, lt, ne, or } from 'drizzle-orm';
 import { getConfig } from '../config.ts';
 import { nowIso, type Db } from '../db/client.ts';
 import { roles, sessions, users } from '../db/schema.ts';
@@ -33,6 +33,20 @@ export function sessionCookieOptions(expires: Date) {
     sameSite: 'lax' as const,
     path: '/',
     expires,
+  };
+}
+
+/**
+ * Attributes for deleting the session cookie. They must match the ones it was
+ * set with: browsers ignore a `__Host-` cookie (even an expired one) that is
+ * not `Secure` with `Path=/`, so deleting without them leaves it in place.
+ */
+export function sessionCookieDeleteOptions() {
+  return {
+    httpOnly: true,
+    secure: getConfig().secure,
+    sameSite: 'lax' as const,
+    path: '/',
   };
 }
 
@@ -140,9 +154,20 @@ export function revokeUserSessions(db: Db, userId: number, exceptSessionId?: str
   return db.delete(sessions).where(where).run().changes;
 }
 
-export function countUserSessions(db: Db, userId: number): number {
-  return db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId)).all()
-    .length;
+/** SQL condition matching sessions that are still usable at `now` (not expired, not idle). */
+export function liveSessionCondition(now: Date = new Date()) {
+  return and(
+    gt(sessions.expiresAt, nowIso(now)),
+    gt(sessions.lastSeenAt, nowIso(new Date(now.getTime() - SESSION_IDLE_TIMEOUT_MS))),
+  );
+}
+
+export function countUserSessions(db: Db, userId: number, now: Date = new Date()): number {
+  return db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.userId, userId), liveSessionCondition(now)))
+    .all().length;
 }
 
 export function purgeExpiredSessions(db: Db, now: Date = new Date()): void {

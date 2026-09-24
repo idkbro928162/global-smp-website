@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Actor } from '../../src/server/auth/authorization.ts';
 import { resetConfigForTests } from '../../src/server/config.ts';
 import type { Db } from '../../src/server/db/client.ts';
-import { contentBlocks, products } from '../../src/server/db/schema.ts';
+import { contentBlocks, products, settings as settingsTable } from '../../src/server/db/schema.ts';
 import {
   createDocPage,
   getPublishedDocPage,
@@ -110,10 +110,12 @@ describe('products', () => {
     });
   });
 
-  it('survives malformed JSON in stored list columns', () => {
+  it('survives malformed or tampered data in stored columns', () => {
     const id = created(createProduct(db, ctx(editor), product()));
     db.update(products)
       .set({
+        builtbybitUrl: 'javascript:alert(1)',
+        supportUrl: 'http://insecure.example',
         features: '{not json',
         platforms: '["paper","bedrock",7]',
         minecraftVersions: '"1.21"',
@@ -122,6 +124,8 @@ describe('products', () => {
       .where(eq(products.id, id))
       .run();
     const p = getPublishedProduct(db, 'test-plugin')!;
+    expect(p.builtbybitUrl).toBe('');
+    expect(p.supportUrl).toBe('');
     expect(p.features).toEqual([]);
     expect(p.platforms).toEqual(['paper']);
     expect(p.minecraftVersions).toEqual([]);
@@ -305,6 +309,11 @@ describe('site content and settings', () => {
     expect(getSettings(db)['links.discord']).toBe('https://discord.gg/abc123');
     expect(updateSettings(db, ctx(admin), { 'links.discord': '' }).ok).toBe(true);
     expect(getSettings(db)['links.discord']).toBe('');
+    // A tampered stored value is treated as unset rather than rendered.
+    db.insert(settingsTable)
+      .values({ key: 'links.discord', value: 'javascript:alert(1)', updatedAt: 'x' })
+      .run();
+    expect(getSettings(db)['links.discord']).toBe('');
   });
 });
 
@@ -364,6 +373,34 @@ describe('media uploads', () => {
       { type: 'image/svg+xml' },
     );
     expect((await uploadImage(db, ctx(actor), svg, '')).ok).toBe(false);
+  });
+
+  it('returns a form error (not a crash) for a truncated image and leaves no files', async () => {
+    // Regression: decoding errors used to escape as a server error.
+    const noisy = await sharp({
+      create: {
+        width: 800,
+        height: 800,
+        channels: 3,
+        background: '#000000',
+        noise: { type: 'gaussian', mean: 128, sigma: 30 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const truncated = noisy.subarray(0, Math.floor(noisy.length / 3));
+    const before = readdirSync(path.join(dataDir, 'uploads')).length;
+    const result = await uploadImage(
+      db,
+      ctx(actor),
+      new File([new Uint8Array(truncated)], 'broken.png', { type: 'image/png' }),
+      '',
+    );
+    expect(result).toEqual({
+      ok: false,
+      errors: { file: 'This image could not be processed. It may be damaged or incomplete.' },
+    });
+    expect(readdirSync(path.join(dataDir, 'uploads'))).toHaveLength(before);
   });
 
   it('refuses to delete an image that a product uses', async () => {

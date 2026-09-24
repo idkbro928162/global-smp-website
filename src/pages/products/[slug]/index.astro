@@ -63,9 +63,10 @@ const latest = product.latestRelease;
             <div class="button-row product-hero__actions">
               {product.builtbybitUrl ? (
                 <a class="button button--primary" href={product.builtbybitUrl}>
-                  {product.availability === 'discontinued'
-                    ? 'View on BuiltByBit'
-                    : 'Buy on BuiltByBit'}
+                  {/* Only available products are promoted as purchasable. */}
+                  {product.availability === 'available'
+                    ? 'Buy on BuiltByBit'
+                    : 'View on BuiltByBit'}
                   <Icon name="external" class="button__icon" />
                   <span class="visually-hidden">(external site)</span>
                 </a>
@@ -280,6 +281,7 @@ const latest = product.latestRelease;
 
   .product-hero__grid {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-6);
     align-items: center;
   }
@@ -326,6 +328,7 @@ const latest = product.latestRelease;
 
   .product-body {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-7);
     padding-block: var(--space-7) var(--space-9);
   }

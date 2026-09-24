@@ -130,6 +130,12 @@
   vertical-align: top;
 }
 
+/* Keep commands/permissions intact inside tables; the .table-scroll wrapper scrolls instead. */
+.prose td code,
+.prose th code {
+  white-space: nowrap;
+}
+
 .prose th {
   background: var(--color-surface);
   font-weight: 650;

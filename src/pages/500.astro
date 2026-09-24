@@ -5,6 +5,7 @@
  * queries for links and copy. Error details are never shown to visitors.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Wordmark from '../components/Wordmark.astro';
 
 Astro.response.status = 500;
 ---
@@ -12,7 +13,7 @@ Astro.response.status = 500;
 <BaseLayout title="Something went wrong" noindex>
   <main id="main-content" class="error-page">
     <a href="/" class="error-page__brand">
-      <img src="/brand/wordmark-light.webp" width="866" height="321" alt="Based Productions" />
+      <Wordmark />
     </a>
     <p class="eyebrow">Error 500</p>
     <h1>Something went wrong</h1>
@@ -33,7 +34,7 @@ Astro.response.status = 500;
     padding: var(--space-8) var(--gutter);
   }
 
-  .error-page__brand img {
+  .error-page__brand :global(img) {
     width: 8rem;
     height: auto;
     margin-bottom: var(--space-7);

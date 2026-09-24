@@ -49,7 +49,7 @@ export const CONTENT_BLOCKS = {
     kind: 'markdown',
     maxLength: 10_000,
     defaultValue:
-      'Development services from Based Productions will be listed here as they become available.',
+      'Information about development work from Based Productions, and how to enquire about a project.',
   },
   'support.intro': {
     label: 'Support introduction',

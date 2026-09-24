@@ -140,6 +140,9 @@ h4 {
   font-weight: 750;
   letter-spacing: -0.015em;
   text-wrap: balance;
+  /* Unlike break-word, "anywhere" also lowers min-content width, so a long
+     unbroken name (e.g. a product title) cannot stretch a grid or flex layout. */
+  overflow-wrap: anywhere;
 }
 
 p {

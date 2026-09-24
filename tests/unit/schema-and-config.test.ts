@@ -1,7 +1,12 @@
 import Database from 'better-sqlite3';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it } from 'vitest';
-import { loadConfig, parseSiteUrl } from '../../src/server/config.ts';
+import { loadConfig, parseSiteUrl, resetConfigForTests } from '../../src/server/config.ts';
+import {
+  sessionCookieDeleteOptions,
+  sessionCookieName,
+  sessionCookieOptions,
+} from '../../src/server/auth/sessions.ts';
 import { applyMigrations } from '../../src/server/db/client.ts';
 import { schema } from '../../src/server/db/schema.ts';
 import { productValuesFromForm, splitList } from '../../src/server/staff/forms.ts';
@@ -74,5 +79,24 @@ describe('staff form parsing', () => {
     ]);
     expect(values.featured).toBe(true);
     expect(splitList(' 1.20.4, 1.21.x  26.1,, ')).toEqual(['1.20.4', '1.21.x', '26.1']);
+  });
+});
+
+describe('session cookie attributes', () => {
+  it('uses a __Host- cookie over HTTPS and deletes it with matching attributes', () => {
+    // Regression: deleting without Secure left the __Host- cookie in the browser.
+    process.env.SITE_URL = 'https://basedproductions.xyz';
+    resetConfigForTests();
+    try {
+      expect(sessionCookieName()).toBe('__Host-bp_session');
+      const set = sessionCookieOptions(new Date());
+      const del = sessionCookieDeleteOptions();
+      for (const options of [set, del]) {
+        expect(options).toMatchObject({ secure: true, path: '/', httpOnly: true, sameSite: 'lax' });
+      }
+    } finally {
+      delete process.env.SITE_URL;
+      resetConfigForTests();
+    }
   });
 });

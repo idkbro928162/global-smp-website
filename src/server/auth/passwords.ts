@@ -17,13 +17,42 @@ export const PASSWORD_MIN_LENGTH = 12;
 // scrypt accepts any length, but capping input bounds the work per request.
 export const PASSWORD_MAX_LENGTH = 256;
 
+/**
+ * Each hash needs ~128 MiB and runs on libuv's shared thread pool (4 threads
+ * by default, also used for file I/O). Capping concurrent hashes keeps a flood
+ * of sign-in attempts from exhausting memory or starving the pool; excess
+ * requests wait their turn (per-IP and per-account rate limits apply first).
+ */
+const MAX_CONCURRENT_HASHES = 2;
+let activeHashes = 0;
+const waiting: (() => void)[] = [];
+
+async function withHashSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activeHashes < MAX_CONCURRENT_HASHES) {
+    activeHashes += 1;
+  } else {
+    // Wait for a finishing hash to hand its slot over directly (count unchanged).
+    await new Promise<void>((resolve) => waiting.push(resolve));
+  }
+  try {
+    return await task();
+  } finally {
+    const next = waiting.shift();
+    if (next) next();
+    else activeHashes -= 1;
+  }
+}
+
 function scryptAsync(password: string, salt: Buffer, options: ScryptOptions): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    scrypt(password.normalize('NFKC'), salt, KEY_LENGTH, options, (err, key) => {
-      if (err) reject(err);
-      else resolve(key);
-    });
-  });
+  return withHashSlot(
+    () =>
+      new Promise((resolve, reject) => {
+        scrypt(password.normalize('NFKC'), salt, KEY_LENGTH, options, (err, key) => {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      }),
+  );
 }
 
 function options(log2N: number, r: number, p: number): ScryptOptions {

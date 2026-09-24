@@ -131,8 +131,12 @@ export function getSettings(db: Db): SettingValues {
       .filter((row) => isSettingKey(row.key))
       .map((row) => [row.key, row.value]),
   );
+  // Stored values are re-checked so a corrupted row is treated as "not set".
   return Object.fromEntries(
-    SETTING_KEYS.map((key) => [key, stored.get(key) ?? '']),
+    SETTING_KEYS.map((key) => {
+      const value = stored.get(key) ?? '';
+      return [key, settingProblem(key, value) === null ? value : ''];
+    }),
   ) as SettingValues;
 }
 

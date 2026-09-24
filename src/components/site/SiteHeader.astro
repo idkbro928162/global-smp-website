@@ -1,5 +1,6 @@
 ---
 import Icon from '../Icon.astro';
+import Wordmark from '../Wordmark.astro';
 
 interface Props {
   storeUrl: string;
@@ -22,14 +23,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(`${href}/`)
 <header class="site-header" id="site-header">
   <div class="container site-header__inner">
     <a class="site-header__brand" href="/">
-      <img
-        src="/brand/wordmark-light.webp"
-        width="866"
-        height="321"
-        alt="Based Productions"
-        class="site-header__logo"
-        decoding="async"
-      />
+      <Wordmark class="site-header__logo" />
     </a>
 
     <nav class="site-nav" aria-label="Main">
@@ -138,7 +132,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(`${href}/`)
     padding: var(--space-1) 0;
   }
 
-  .site-header__logo {
+  .site-header__brand :global(.site-header__logo) {
     height: 2.125rem;
     width: auto;
   }

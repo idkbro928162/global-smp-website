@@ -14,6 +14,7 @@ import {
   LIMITS,
   optionalText,
   requiredText,
+  safeStoredUrl,
   slugSchema,
   validate,
   type Result,
@@ -122,13 +123,13 @@ export function listDocCollections(db: Db): DocCollection[] {
     .all();
   for (const product of productRows) {
     const pages = publishedPages(db, product.id);
-    if (pages.length === 0 && !product.externalDocsUrl) continue;
+    if (pages.length === 0 && !safeStoredUrl(product.externalDocsUrl)) continue;
     collections.push({
       key: product.slug,
       title: product.name,
       description: product.tagline,
       productId: product.id,
-      externalUrl: product.externalDocsUrl,
+      externalUrl: safeStoredUrl(product.externalDocsUrl),
       pages,
     });
   }

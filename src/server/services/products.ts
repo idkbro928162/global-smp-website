@@ -35,6 +35,7 @@ import {
   optionalUrl,
   parseJsonArray,
   requiredText,
+  safeStoredUrl,
   slugSchema,
   validate,
   type Result,
@@ -117,9 +118,9 @@ function toProduct(row: ProductRow, mediaById: Map<string, MediaItem>): Product 
     minecraftVersions,
     platforms,
     javaVersion: row.javaVersion,
-    builtbybitUrl: row.builtbybitUrl,
-    externalDocsUrl: row.externalDocsUrl,
-    supportUrl: row.supportUrl,
+    builtbybitUrl: safeStoredUrl(row.builtbybitUrl, BUILTBYBIT_HOSTS),
+    externalDocsUrl: safeStoredUrl(row.externalDocsUrl),
+    supportUrl: safeStoredUrl(row.supportUrl),
     launchedOn: row.launchedOn,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -326,8 +327,6 @@ export const productInputSchema = z.object({
     .array(z.string().refine(isMediaId, 'Unknown image.'))
     .max(LIMITS.maxScreenshots, `Choose at most ${LIMITS.maxScreenshots} screenshots.`),
 });
-
-export type ProductInput = z.input<typeof productInputSchema>;
 
 type ValidProductInput = z.output<typeof productInputSchema>;
 

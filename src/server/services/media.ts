@@ -125,24 +125,40 @@ export async function uploadImage(
     return { ok: false, errors: { file: 'Upload a PNG, JPEG, WebP, GIF or AVIF image.' } };
   }
 
+  // Decode and re-encode first. Any failure here (corrupt, truncated or
+  // hostile input) is the uploader's problem and becomes a form error;
+  // failures after this point are server errors and propagate.
+  let encoded: { rendition: Rendition; data: Buffer; width: number; height: number }[];
+  try {
+    encoded = await Promise.all(
+      (Object.entries(RENDITIONS) as [Rendition, number][]).map(async ([rendition, maxWidth]) => {
+        const { data, info } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
+          .rotate() // apply EXIF orientation before metadata is stripped
+          .resize({ width: maxWidth, withoutEnlargement: true })
+          .webp({ quality: rendition === 'lg' ? 82 : 78 })
+          .toBuffer({ resolveWithObject: true });
+        return { rendition, data, width: info.width, height: info.height };
+      }),
+    );
+  } catch {
+    return {
+      ok: false,
+      errors: { file: 'This image could not be processed. It may be damaged or incomplete.' },
+    };
+  }
+  const large = encoded.find((r) => r.rendition === 'lg');
+  if (!large) throw new Error('Large rendition missing');
+
   const id = randomBytes(16).toString('base64url');
   const dir = getConfig().uploadsDir;
   await mkdir(dir, { recursive: true });
   const written: string[] = [];
   try {
-    let large: { width: number; height: number; size: number } | undefined;
-    for (const [rendition, maxWidth] of Object.entries(RENDITIONS) as [Rendition, number][]) {
-      const { data, info } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
-        .rotate() // apply EXIF orientation before metadata is stripped
-        .resize({ width: maxWidth, withoutEnlargement: true })
-        .webp({ quality: rendition === 'lg' ? 82 : 78 })
-        .toBuffer({ resolveWithObject: true });
+    for (const { rendition, data } of encoded) {
       const target = path.join(dir, `${id}-${rendition}.webp`);
       await writeFile(target, data, { flag: 'wx' });
       written.push(target);
-      if (rendition === 'lg') large = { width: info.width, height: info.height, size: info.size };
     }
-    if (!large) throw new Error('Large rendition missing');
     const originalName = file.name.replace(/[^\w.\- ()]+/g, '_').slice(0, 120) || 'image';
     const row = {
       id,
@@ -150,7 +166,7 @@ export async function uploadImage(
       alt: alt.value,
       width: large.width,
       height: large.height,
-      bytes: large.size,
+      bytes: large.data.length,
       createdBy: ctx.actor.id,
       createdAt: nowIso(),
     };
@@ -164,9 +180,6 @@ export async function uploadImage(
     return { ok: true, value: toItem(row) };
   } catch (error) {
     await Promise.all(written.map((file) => rm(file, { force: true })));
-    if (error instanceof Error && /unsupported image format|Input buffer/i.test(error.message)) {
-      return { ok: false, errors: { file: 'This image could not be processed.' } };
-    }
     throw error;
   }
 }

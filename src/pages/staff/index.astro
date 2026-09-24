@@ -144,6 +144,7 @@ const quickActions = [
 <style>
   .dashboard {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-7);
   }
 
@@ -159,7 +160,7 @@ const quickActions = [
 
   .counts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
     gap: var(--space-3);
     list-style: none;
     padding: 0;
@@ -198,6 +199,7 @@ const quickActions = [
 
   .checklist {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
     list-style: none;
     padding: 0;
@@ -240,6 +242,13 @@ const quickActions = [
 
   .simple-list li:last-child {
     border-bottom: 0;
+  }
+
+  /* Flex items default to min-width: auto; let long names wrap instead of overflowing. */
+  .checklist li > span,
+  .simple-list li > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .card__footer {

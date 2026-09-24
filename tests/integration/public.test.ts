@@ -63,6 +63,16 @@ describe('public site', () => {
     expect(sitemap).not.toContain('/staff');
   });
 
+  it('disables unused framework endpoints', async () => {
+    for (const path of [
+      '/_image?href=/brand/og-default.png&w=4000&h=4000&f=png',
+      '/_server-islands/x',
+      '/_actions/x',
+    ]) {
+      expect((await get(path)).status, path).toBe(404);
+    }
+  });
+
   it('only serves media files that exist in the library', async () => {
     for (const path of [
       '/media/..%2Fbased-productions.db',

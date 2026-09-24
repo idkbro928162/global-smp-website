@@ -46,6 +46,24 @@ describe('unauthenticated access', () => {
     expect(response.status).toBe(401);
   });
 
+  it('rejects unauthenticated POSTs before reading their bodies', async () => {
+    // Regression: bodies (up to 11 MB on /staff/media) used to be buffered
+    // before the session check, and oversized ones answered 413, not 401.
+    const big = 'x'.repeat(2 * 1024 * 1024);
+    for (const path of ['/staff/products/new', '/staff/media']) {
+      const response = await post(path, { name: big }, { ip: IP });
+      expect(response.status, path).toBe(401);
+    }
+  });
+
+  it('still enforces the body size limit for signed-in staff', async () => {
+    const owner = await signIn('owner@example.test', IP);
+    const response = await owner.post('/staff/settings', {
+      'links.github': 'x'.repeat(2 * 1024 * 1024),
+    });
+    expect(response.status).toBe(413);
+  });
+
   it('ignores forged session cookies and client-side "admin" flags', async () => {
     const forged = await get('/staff', {
       ip: IP,

@@ -1,6 +1,7 @@
 ---
 import type { ContentValues, SettingValues } from '../../server/services/site.ts';
 import Icon from '../Icon.astro';
+import Wordmark from '../Wordmark.astro';
 
 interface Props {
   settings: SettingValues;
@@ -24,14 +25,7 @@ const year = new Date().getUTCFullYear();
   <div class="container">
     <div class="site-footer__grid">
       <div class="site-footer__brand">
-        <img
-          src="/brand/wordmark-light.webp"
-          width="866"
-          height="321"
-          alt="Based Productions"
-          loading="lazy"
-          decoding="async"
-        />
+        <Wordmark loading="lazy" />
         <p>Minecraft plugins and server software.</p>
       </div>
 
@@ -106,10 +100,11 @@ const year = new Date().getUTCFullYear();
 
   .site-footer__grid {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-7);
   }
 
-  .site-footer__brand img {
+  .site-footer__brand :global(img) {
     width: 8.5rem;
     height: auto;
   }

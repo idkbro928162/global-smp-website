@@ -8,6 +8,7 @@ import '../styles/staff.css';
 import CsrfField from '../components/staff/form/CsrfField.astro';
 import StaffNav from '../components/staff/StaffNav.astro';
 import Icon from '../components/Icon.astro';
+import Wordmark from '../components/Wordmark.astro';
 import { noticeFor } from '../server/staff/page.ts';
 import BaseLayout from './BaseLayout.astro';
 
@@ -31,7 +32,7 @@ const notice = noticeFor(Astro.url);
   <div class:list={['staff', { 'staff--bare': !chrome || !actor }]}>
     <header class="staff-topbar">
       <a class="staff-topbar__brand" href={actor ? '/staff' : '/'}>
-        <img src="/brand/wordmark-light.webp" width="866" height="321" alt="Based Productions" />
+        <Wordmark />
         <span class="staff-topbar__label mono">Staff</span>
       </a>
       {chrome && actor && (
@@ -70,7 +71,7 @@ const notice = noticeFor(Astro.url);
         <div>
           {back && (
             <a class="staff-back" href={back.href}>
-              <Icon name="arrow-left" size={14} /> {back.label}
+              <Icon name="arrow-left" size={14} /> <span>{back.label}</span>
             </a>
           )}
           <h1>{title}</h1>

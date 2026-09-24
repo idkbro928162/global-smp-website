@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { sessionCookieName } from '../../server/auth/sessions.ts';
+import { sessionCookieDeleteOptions, sessionCookieName } from '../../server/auth/sessions.ts';
 import { getDb } from '../../server/db/client.ts';
 import { logout } from '../../server/services/auth.ts';
 import { mutationContext } from '../../server/staff/page.ts';
@@ -11,6 +11,6 @@ import { mutationContext } from '../../server/staff/page.ts';
 export const POST: APIRoute = (context) => {
   const session = context.locals.session;
   if (session) logout(getDb(), mutationContext(context), session.id);
-  context.cookies.delete(sessionCookieName(), { path: '/' });
+  context.cookies.delete(sessionCookieName(), sessionCookieDeleteOptions());
   return context.redirect('/staff/login?notice=signed-out', 303);
 };

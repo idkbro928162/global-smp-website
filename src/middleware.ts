@@ -16,7 +16,11 @@
  */
 import { defineMiddleware } from 'astro:middleware';
 import { ForbiddenError, NotFoundError, can } from './server/auth/authorization.ts';
-import { resolveSession, sessionCookieName } from './server/auth/sessions.ts';
+import {
+  resolveSession,
+  sessionCookieDeleteOptions,
+  sessionCookieName,
+} from './server/auth/sessions.ts';
 import { getConfig } from './server/config.ts';
 import { getDb } from './server/db/client.ts';
 import { applySecurityHeaders } from './server/security/headers.ts';
@@ -37,6 +41,11 @@ const SESSIONLESS_STAFF_ROUTES = [/^\/staff\/login\/?$/, /^\/staff\/setup\/[^/]+
 /** Staff routes that need a session but not `panel.access`. */
 const SESSION_ONLY_STAFF_ROUTES = [/^\/staff\/forbidden\/?$/, /^\/staff\/logout\/?$/];
 const UPLOAD_ROUTES = [/^\/staff\/media\/?$/];
+/**
+ * Framework endpoints this site does not use. `/_image` would otherwise let
+ * anyone trigger on-demand image transforms (CPU) on bundled images.
+ */
+const DISABLED_FRAMEWORK_ROUTES = [/^\/_image\/?$/, /^\/_server-islands\//, /^\/_actions\//];
 
 function isStaffPath(pathname: string): boolean {
   return pathname === STAFF_ROOT || pathname.startsWith(`${STAFF_ROOT}/`);
@@ -85,6 +94,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return response;
   };
 
+  if (DISABLED_FRAMEWORK_ROUTES.some((r) => r.test(pathname))) {
+    return finish(new Response('Not found', { status: 404 }));
+  }
+
   try {
     const safe = isSafeMethod(request.method);
     if (!safe) {
@@ -100,10 +113,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
           errorPage(403, 'Request blocked', 'This form was submitted from another site.'),
         );
       }
-      const limit = UPLOAD_ROUTES.some((r) => r.test(pathname))
-        ? UPLOAD_FORM_LIMIT_BYTES
-        : DEFAULT_FORM_LIMIT_BYTES;
-      locals.form = await readFormData(request, limit);
     }
 
     if (!staff) return finish(await next());
@@ -112,26 +121,38 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const cookieName = sessionCookieName();
     const token = context.cookies.get(cookieName)?.value;
     const resolved = token ? resolveSession(db, token) : null;
-    if (token && !resolved) context.cookies.delete(cookieName, { path: '/' });
+    if (token && !resolved) context.cookies.delete(cookieName, sessionCookieDeleteOptions());
     if (resolved) {
       locals.actor = resolved.actor;
       locals.session = { id: resolved.sessionId, csrfToken: resolved.csrfToken };
     }
 
     const sessionless = SESSIONLESS_STAFF_ROUTES.some((r) => r.test(pathname));
-    if (!sessionless) {
-      if (!resolved) {
-        if (safe) {
-          const nextPath = `${pathname}${url.search}`;
-          return finish(context.redirect(`/staff/login?next=${encodeURIComponent(nextPath)}`));
-        }
-        return finish(
-          errorPage(401, 'Signed out', 'Your session has ended. Sign in again to continue.', [
-            '/staff/login',
-            'Sign in',
-          ]),
-        );
+    if (!sessionless && !resolved) {
+      if (safe) {
+        const nextPath = `${pathname}${url.search}`;
+        return finish(context.redirect(`/staff/login?next=${encodeURIComponent(nextPath)}`));
       }
+      return finish(
+        errorPage(401, 'Signed out', 'Your session has ended. Sign in again to continue.', [
+          '/staff/login',
+          'Sign in',
+        ]),
+      );
+    }
+
+    // Bodies are read only after the session check, so unauthenticated clients
+    // cannot make the server buffer large payloads, and only signed-in staff
+    // get the larger upload allowance.
+    if (!safe) {
+      const upload = resolved !== null && UPLOAD_ROUTES.some((r) => r.test(pathname));
+      locals.form = await readFormData(
+        request,
+        upload ? UPLOAD_FORM_LIMIT_BYTES : DEFAULT_FORM_LIMIT_BYTES,
+      );
+    }
+
+    if (!sessionless && resolved) {
       if (!safe && !verifyCsrfToken(locals.form ?? new FormData(), resolved.csrfToken)) {
         return finish(
           errorPage(

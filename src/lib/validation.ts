@@ -91,8 +91,13 @@ export function optionalUrl(hosts?: readonly string[]) {
     });
 }
 
-export function requiredUrl(hosts?: readonly string[]) {
-  return optionalUrl(hosts).refine((value) => value.length > 0, 'A link is required.');
+/**
+ * Read-side guard for stored links: returns the URL only if it still passes
+ * `urlProblem`, otherwise ''. Writes are validated already; this keeps a
+ * hand-edited or corrupted row from ever reaching an href as e.g. javascript:.
+ */
+export function safeStoredUrl(value: string | null | undefined, hosts?: readonly string[]): string {
+  return value && urlProblem(value, hosts) === null ? value : '';
 }
 
 export const BUILTBYBIT_HOSTS = ['builtbybit.com'] as const;

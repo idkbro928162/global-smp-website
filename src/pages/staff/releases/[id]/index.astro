@@ -35,7 +35,17 @@ const existing = id !== null ? getReleaseForStaff(db, actor, id) : null;
 const products = listProductOptions(db, actor);
 const presetProduct = parseId(Astro.url.searchParams.get('product') ?? undefined);
 
-let values = {
+const FIELDS = [
+  'productId',
+  'version',
+  'channel',
+  'title',
+  'notes',
+  'releasedOn',
+  'visibility',
+] as const;
+// Form values are plain strings; the release service validates them.
+let values: Record<(typeof FIELDS)[number], string> = {
   productId: String(existing?.productId ?? presetProduct ?? ''),
   version: existing?.version ?? '',
   channel: existing?.channel ?? 'stable',
@@ -49,15 +59,7 @@ let preview: SafeHtml | null = null;
 
 if (Astro.request.method === 'POST') {
   const form = submittedForm(Astro);
-  values = {
-    productId: field(form, 'productId'),
-    version: field(form, 'version'),
-    channel: field(form, 'channel') as typeof values.channel,
-    title: field(form, 'title'),
-    notes: field(form, 'notes'),
-    releasedOn: field(form, 'releasedOn'),
-    visibility: field(form, 'visibility') as typeof values.visibility,
-  };
+  values = Object.fromEntries(FIELDS.map((name) => [name, field(form, name)])) as typeof values;
   if (field(form, 'intent') === 'preview') {
     preview = renderMarkdown(values.notes, { baseLevel: 3 }).html;
   } else {

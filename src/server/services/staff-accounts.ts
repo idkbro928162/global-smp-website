@@ -19,7 +19,7 @@ import {
   type Actor,
 } from '../auth/authorization.ts';
 import type { Permission } from '../auth/permissions.ts';
-import { revokeUserSessions } from '../auth/sessions.ts';
+import { liveSessionCondition, revokeUserSessions } from '../auth/sessions.ts';
 import { nowIso, type Db } from '../db/client.ts';
 import { accountTokens, roles, sessions, users, type UserStatus } from '../db/schema.ts';
 import { LIMITS, emailSchema, requiredText, validate, type Result } from '../../lib/validation.ts';
@@ -52,6 +52,7 @@ function loadAccounts(db: Db, where?: SQL): StaffAccount[] {
     db
       .select({ userId: sessions.userId, n: sql<number>`count(*)` })
       .from(sessions)
+      .where(liveSessionCondition())
       .groupBy(sessions.userId)
       .all()
       .map((r) => [r.userId, r.n]),

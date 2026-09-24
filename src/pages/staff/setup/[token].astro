@@ -36,7 +36,10 @@ if (!target && !blocked) Astro.response.status = 404;
 const isSetup = target?.purpose === 'setup';
 ---
 
-<StaffLayout title={isSetup ? 'Set up your account' : 'Choose a new password'} chrome={false}>
+<StaffLayout
+  title={!target ? 'Link not valid' : isSetup ? 'Set up your account' : 'Choose a new password'}
+  chrome={false}
+>
   {blocked ? (
     <div class="notice notice--danger" role="alert">
       {blocked}

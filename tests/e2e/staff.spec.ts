@@ -111,6 +111,36 @@ test.describe('signed in', () => {
     await expect(page.locator('#field-name')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  test('long unbroken names never cause horizontal overflow', async ({ page }) => {
+    // Regression: implicit grid tracks and flex items sized to the min-content
+    // width of an 80-character unbroken name overflowed phones by ~1500px.
+    const name = `Unbroken${'X'.repeat(72)}`;
+    await page.goto('/staff/products/new');
+    await page.getByLabel('Name', { exact: true }).fill(name);
+    await page.getByLabel('URL slug').fill('overflow-regression');
+    await page.getByLabel('Short description').fill('Y'.repeat(180));
+    await page.getByLabel('Visibility').selectOption('published');
+    await page.getByRole('button', { name: 'Create product' }).click();
+    await expect(page).toHaveURL(/notice=created/);
+    const id = /\/staff\/products\/(\d+)/.exec(page.url())![1];
+    for (const width of [320, 768]) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const path of [
+        '/',
+        '/products',
+        '/products/overflow-regression',
+        '/staff',
+        `/staff/products/${id}/delete`,
+      ]) {
+        await page.goto(path);
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow, `${path} at ${width}px`).toBeLessThanOrEqual(0);
+      }
+    }
+  });
+
   test('signs out', async ({ page }) => {
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/staff\/login\?notice=signed-out$/);
