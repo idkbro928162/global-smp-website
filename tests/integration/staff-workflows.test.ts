@@ -60,6 +60,24 @@ describe('content workflow', () => {
     expect(await (await get('/sitemap.xml')).text()).toContain('/products/integration-plugin');
   });
 
+  it('only presents available products as purchasable', async () => {
+    // Regression: in-development products with a listing link said "Buy".
+    const editor = await signIn('editor@example.test', IP);
+    const response = await editor.post(
+      '/staff/products/new',
+      productFields({
+        name: 'Coming Soon Plugin',
+        slug: 'coming-soon-plugin',
+        availability: 'in_development',
+        visibility: 'published',
+      }),
+    );
+    expect(response.status).toBe(303);
+    const html = await (await get('/products/coming-soon-plugin')).text();
+    expect(html).toContain('View on BuiltByBit');
+    expect(html).not.toContain('Buy on BuiltByBit');
+  });
+
   it('returns field errors for invalid input without saving', async () => {
     const editor = await signIn('editor@example.test', IP);
     const response = await editor.post(

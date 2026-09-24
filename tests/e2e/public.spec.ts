@@ -77,9 +77,14 @@ test.describe('keyboard and navigation', () => {
     await page.goto('/');
     const toggle = page.locator('.mobile-nav summary');
     await expect(page.getByRole('navigation', { name: 'Main', exact: true })).toBeHidden();
+    // Regression: a scoped-style bug showed both icons at once.
+    await expect(toggle.locator('.mobile-nav__icon-open')).toBeVisible();
+    await expect(toggle.locator('.mobile-nav__icon-close')).toBeHidden();
     await toggle.click();
     const mobileNav = page.getByRole('navigation', { name: 'Main (mobile)' });
     await expect(mobileNav).toBeVisible();
+    await expect(toggle.locator('.mobile-nav__icon-open')).toBeHidden();
+    await expect(toggle.locator('.mobile-nav__icon-close')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(mobileNav).toBeHidden();
     await expect(toggle).toBeFocused();
