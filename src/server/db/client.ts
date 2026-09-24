@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import Database, { type RunResult } from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -88,9 +88,27 @@ export function openDatabase(file: string): DatabaseHandle {
 
 let handle: DatabaseHandle | undefined;
 
+/**
+ * Disposable Vercel previews only (see astro.config.mjs): an instance that
+ * starts without a database begins from the demo snapshot bundled with the
+ * deployment. Requires both VERCEL=1 and PREVIEW_SEED_DIR, so it never runs on
+ * a normal server, and never overwrites an existing database.
+ */
+function restorePreviewSeed(dataDir: string, databasePath: string): void {
+  const seedDir = process.env.PREVIEW_SEED_DIR?.trim();
+  if (process.env.VERCEL !== '1' || !seedDir || existsSync(databasePath)) return;
+  const source = path.resolve(seedDir);
+  if (!existsSync(path.join(source, 'based-productions.db'))) return;
+  cpSync(source, dataDir, { recursive: true });
+}
+
 /** Process-wide database handle, opened lazily from DATA_DIR. */
 export function getDb(): Db {
-  handle ??= openDatabase(getConfig().databasePath);
+  if (!handle) {
+    const config = getConfig();
+    restorePreviewSeed(config.dataDir, config.databasePath);
+    handle = openDatabase(config.databasePath);
+  }
   return handle.db;
 }
 

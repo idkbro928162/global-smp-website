@@ -4,6 +4,8 @@ node_modules/
 # Build output / framework caches
 dist/
 .astro/
+.vercel/
+.vercel-preview-seed/
 
 # Runtime data: SQLite database, uploaded media, backups.
 # Never commit this directory — it contains staff accounts and session data.
