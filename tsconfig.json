@@ -1,0 +1,15 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist", "data", "test-results", "playwright-report"],
+  "compilerOptions": {
+    // Server modules are shared between Astro (Vite) and plain Node CLI scripts
+    // (run with Node's built-in type stripping), so they must use erasable
+    // syntax only and explicit `.ts` import extensions.
+    "erasableSyntaxOnly": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node"]
+  }
+}

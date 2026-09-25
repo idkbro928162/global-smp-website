@@ -1,0 +1,88 @@
+---
+import { RELEASE_CHANNELS } from '../../lib/catalog.ts';
+import { formatDate, isoDate } from '../../lib/format.ts';
+import { renderMarkdown } from '../../lib/markdown.ts';
+import type { Release } from '../../server/services/releases.ts';
+import Markdown from '../Markdown.astro';
+
+interface Props {
+  release: Release;
+  /** Show the product name (for the cross-product changelog). */
+  showProduct?: boolean;
+  headingLevel?: 'h2' | 'h3';
+}
+
+const { release, showProduct = false, headingLevel: Heading = 'h2' } = Astro.props;
+const notes = renderMarkdown(release.notes, { baseLevel: Heading === 'h2' ? 3 : 4 });
+const anchor = `v-${release.version}`;
+---
+
+<article class="release" id={showProduct ? undefined : anchor}>
+  <header class="release__header">
+    <Heading class="release__version">
+      {showProduct ? (
+        <a href={`/products/${release.productSlug}/changelog#${anchor}`}>
+          {release.productName} <span class="mono">{release.version}</span>
+        </a>
+      ) : (
+        <a href={`#${anchor}`} class="mono">
+          {release.version}
+        </a>
+      )}
+    </Heading>
+    {release.channel !== 'stable' && (
+      <span class="badge badge--pending">{RELEASE_CHANNELS[release.channel]}</span>
+    )}
+    <time class="release__date mono" datetime={isoDate(release.releasedOn)}>
+      {formatDate(release.releasedOn)}
+    </time>
+  </header>
+  {release.title && <p class="release__title">{release.title}</p>}
+  {release.notes.trim() ? (
+    <Markdown html={notes.html} compact />
+  ) : (
+    <p class="subtle">No release notes were published for this version.</p>
+  )}
+</article>
+
+<style>
+  .release {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding-block: var(--space-6);
+    border-bottom: 1px solid var(--color-border);
+    scroll-margin-top: calc(var(--header-height) + var(--space-4));
+  }
+
+  .release__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .release__version {
+    font-size: var(--text-xl);
+    font-weight: 750;
+  }
+
+  .release__version a {
+    text-decoration: none;
+  }
+
+  .release__version a:hover {
+    text-decoration: underline;
+  }
+
+  .release__date {
+    margin-left: auto;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+  }
+
+  .release__title {
+    font-weight: 600;
+    color: var(--color-text);
+  }
+</style>

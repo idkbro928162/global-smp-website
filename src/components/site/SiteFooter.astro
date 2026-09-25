@@ -1,0 +1,179 @@
+---
+import type { ContentValues, SettingValues } from '../../server/services/site.ts';
+import Icon from '../Icon.astro';
+import Wordmark from '../Wordmark.astro';
+
+interface Props {
+  settings: SettingValues;
+  content: ContentValues;
+}
+
+const { settings, content } = Astro.props;
+
+const external = [
+  { label: 'BuiltByBit', href: settings['links.builtbybit'] },
+  { label: 'Discord', href: settings['links.discord'] },
+  { label: 'GitHub', href: settings['links.github'] },
+  { label: 'YouTube', href: settings['links.youtube'] },
+  { label: 'X', href: settings['links.x'] },
+].filter((link) => link.href);
+
+const year = new Date().getUTCFullYear();
+---
+
+<footer class="site-footer" id="site-footer">
+  <div class="container">
+    <div class="site-footer__grid">
+      <div class="site-footer__brand">
+        <Wordmark loading="lazy" />
+        <p>Minecraft plugins and server software.</p>
+      </div>
+
+      <nav class="site-footer__nav" aria-label="Footer">
+        <div>
+          <h2>Products</h2>
+          <ul>
+            <li>
+              <a href="/products">All products</a>
+            </li>
+            <li>
+              <a href="/changelog">Changelog</a>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h2>Help</h2>
+          <ul>
+            <li>
+              <a href="/docs">Documentation</a>
+            </li>
+            <li>
+              <a href="/support">Support</a>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h2>Company</h2>
+          <ul>
+            <li>
+              <a href="/about">About &amp; team</a>
+            </li>
+            <li>
+              <a href="/services">Services</a>
+            </li>
+          </ul>
+        </div>
+        {external.length > 0 && (
+          <div>
+            <h2>Elsewhere</h2>
+            <ul>
+              {external.map((link) => (
+                <li>
+                  <a href={link.href}>
+                    {link.label}
+                    <Icon name="external" size={12} />
+                    <span class="visually-hidden">(external site)</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </nav>
+    </div>
+
+    <div class="site-footer__legal">
+      <p>© {year} Based Productions</p>
+      {content['footer.disclaimer'] && <p>{content['footer.disclaimer']}</p>}
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    margin-top: auto;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-raised);
+    padding-block: var(--space-8) var(--space-6);
+    font-size: var(--text-sm);
+  }
+
+  .site-footer__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-7);
+  }
+
+  .site-footer__brand :global(img) {
+    width: 8.5rem;
+    height: auto;
+  }
+
+  .site-footer__brand p {
+    margin-top: var(--space-4);
+    color: var(--color-text-muted);
+    max-width: 22rem;
+  }
+
+  .site-footer__nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6) var(--space-5);
+  }
+
+  .site-footer__nav h2 {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+    margin-bottom: var(--space-3);
+  }
+
+  .site-footer__nav ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .site-footer__nav li + li {
+    margin-top: var(--space-1);
+  }
+
+  .site-footer__nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    min-height: 2rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+  }
+
+  .site-footer__nav a:hover {
+    color: var(--color-text);
+  }
+
+  .site-footer__legal {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-6);
+    margin-top: var(--space-8);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+  }
+
+  @media (min-width: 48rem) {
+    .site-footer__nav {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .site-footer__grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    }
+  }
+</style>

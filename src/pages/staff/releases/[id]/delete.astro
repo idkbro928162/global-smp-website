@@ -1,0 +1,27 @@
+---
+import ConfirmDelete from '../../../../components/staff/ConfirmDelete.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { getDb } from '../../../../server/db/client.ts';
+import { deleteRelease, getReleaseForStaff } from '../../../../server/services/releases.ts';
+import { mutationContext, parseId, requirePermission } from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'releases.manage');
+const db = getDb();
+const id = parseId(Astro.params.id);
+if (id === null) return Astro.rewrite('/404');
+const release = getReleaseForStaff(db, actor, id);
+
+if (Astro.request.method === 'POST') {
+  deleteRelease(db, mutationContext(Astro), id);
+  return Astro.redirect('/staff/releases?notice=deleted', 303);
+}
+const label = `${release.productName} ${release.version}`;
+---
+
+<StaffLayout title="Delete release" back={{ href: `/staff/releases/${id}`, label }}>
+  <ConfirmDelete
+    subject={label}
+    cancelHref={`/staff/releases/${id}`}
+    consequences={['The release is removed from the product changelog immediately.']}
+  />
+</StaffLayout>

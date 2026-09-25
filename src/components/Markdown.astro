@@ -1,0 +1,19 @@
+---
+/**
+ * The only component that renders raw HTML. It accepts `SafeHtml`, which can
+ * only be produced by src/lib/markdown.ts (raw HTML disabled, link schemes
+ * allow-listed, images restricted to /media uploads).
+ */
+import type { SafeHtml } from '../lib/markdown.ts';
+
+interface Props {
+  html: SafeHtml;
+  class?: string;
+  compact?: boolean;
+}
+
+const { html, class: className, compact = false } = Astro.props;
+---
+
+{/* eslint-disable-next-line astro/no-set-html-directive -- SafeHtml from the sanitising renderer */}
+<div class:list={['prose', { 'prose--compact': compact }, className]} set:html={html} />

@@ -1,0 +1,367 @@
+---
+/** Create (/staff/products/new) or edit (/staff/products/<id>) a product. */
+import CsrfField from '../../../../components/staff/form/CsrfField.astro';
+import Checkboxes from '../../../../components/staff/form/Checkboxes.astro';
+import ErrorSummary from '../../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../../components/staff/form/Field.astro';
+import MediaPicker from '../../../../components/staff/form/MediaPicker.astro';
+import Select from '../../../../components/staff/form/Select.astro';
+import TextArea from '../../../../components/staff/form/TextArea.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { ACCENTS, AVAILABILITY, PLATFORMS } from '../../../../lib/catalog.ts';
+import { renderMarkdown, type SafeHtml } from '../../../../lib/markdown.ts';
+import { LIMITS, slugFromName } from '../../../../lib/validation.ts';
+import { getDb } from '../../../../server/db/client.ts';
+import { listMedia } from '../../../../server/services/media.ts';
+import {
+  createProduct,
+  getProductForStaff,
+  updateProduct,
+} from '../../../../server/services/products.ts';
+import {
+  emptyProductValues,
+  productInput,
+  productValues,
+  productValuesFromForm,
+} from '../../../../server/staff/forms.ts';
+import {
+  errorsForFields,
+  field,
+  mutationContext,
+  parseId,
+  requirePermission,
+  submittedForm,
+} from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'products.manage');
+const db = getDb();
+const isNew = Astro.params.id === 'new';
+const id = isNew ? null : parseId(Astro.params.id);
+if (!isNew && id === null) return Astro.rewrite('/404');
+
+const existing = id !== null ? getProductForStaff(db, actor, id) : null;
+let values = existing ? productValues(existing) : emptyProductValues();
+let errors: Record<string, string> = {};
+let preview: SafeHtml | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  values = productValuesFromForm(form);
+  // New products get a slug from their name unless one was typed.
+  if (isNew && !values.slug.trim()) values.slug = slugFromName(values.name);
+  if (field(form, 'intent') === 'preview') {
+    preview = renderMarkdown(values.description, { baseLevel: 3 }).html;
+  } else {
+    const ctx = mutationContext(Astro);
+    const result =
+      id === null
+        ? createProduct(db, ctx, productInput(values))
+        : updateProduct(db, ctx, id, productInput(values));
+    if (result.ok) {
+      return Astro.redirect(
+        `/staff/products/${result.value.id}?notice=${id === null ? 'created' : 'saved'}`,
+        303,
+      );
+    }
+    errors = errorsForFields(result.errors, ['minecraftVersions', 'platforms', 'screenshotIds']);
+  }
+}
+
+// Demo-seed images are only offered to demo products.
+const media = listMedia(db, actor, { includeDemo: existing?.isDemo ?? false });
+// Always offer a few blank rows for new features (no JavaScript needed).
+const featureRows = [
+  ...values.features,
+  ...Array.from({ length: Math.max(3, 6 - values.features.length) }, () => ({
+    title: '',
+    body: '',
+  })),
+].slice(0, LIMITS.maxFeatures);
+
+const labels: Record<string, string> = {
+  name: 'Name',
+  slug: 'URL slug',
+  tagline: 'Short description',
+  description: 'Full description',
+  visibility: 'Visibility',
+  availability: 'Availability',
+  sortOrder: 'Sort order',
+  accent: 'Accent colour',
+  artworkId: 'Artwork',
+  minecraftVersions: 'Minecraft versions',
+  platforms: 'Platforms',
+  javaVersion: 'Java version',
+  builtbybitUrl: 'BuiltByBit listing',
+  externalDocsUrl: 'External documentation',
+  supportUrl: 'Support link',
+  launchedOn: 'First released',
+  screenshotIds: 'Screenshots',
+  features: 'Features',
+};
+for (let i = 0; i < featureRows.length; i++) {
+  labels[`features.${i}.title`] = `Feature ${i + 1} title`;
+  labels[`features.${i}.body`] = `Feature ${i + 1} description`;
+}
+---
+
+<StaffLayout
+  title={existing ? existing.name : 'New product'}
+  back={{ href: '/staff/products', label: 'Products' }}
+>
+  <Fragment slot="actions">
+    {existing && existing.visibility === 'published' && (
+      <a class="button button--small" href={`/products/${existing.slug}`}>
+        View on site
+      </a>
+    )}
+  </Fragment>
+
+  <form method="post" class="form" novalidate>
+    <CsrfField />
+    {/* Default button: pressing Enter in a field saves instead of triggering "Preview". */}
+    <button type="submit" name="intent" value="save" hidden tabindex="-1">
+      Save
+    </button>
+    <ErrorSummary errors={errors} labels={labels} />
+
+    <section class="card" aria-labelledby="basics-title">
+      <h2 id="basics-title">Basics</h2>
+      <div class="form">
+        <div class="form-row">
+          <Field
+            name="name"
+            label="Name"
+            value={values.name}
+            required
+            maxlength={LIMITS.name}
+            error={errors.name}
+          />
+          <Field
+            name="slug"
+            label="URL slug"
+            value={values.slug}
+            required={!isNew}
+            maxlength={64}
+            mono
+            hint={
+              isNew
+                ? 'Used in the product URL, e.g. /products/anti-esp. Leave empty to create it from the name.'
+                : "Lowercase letters, numbers and hyphens. Changing it changes the product's URL and breaks old links."
+            }
+            error={errors.slug}
+          />
+        </div>
+        <Field
+          name="tagline"
+          label="Short description"
+          value={values.tagline}
+          maxlength={LIMITS.tagline}
+          hint="One sentence shown on product cards and in search results."
+          error={errors.tagline}
+        />
+        <TextArea
+          name="description"
+          label="Full description"
+          value={values.description}
+          rows={12}
+          maxlength={LIMITS.markdown}
+          markdown
+          preview={preview}
+          error={errors.description}
+        />
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="status-title">
+      <h2 id="status-title">Status and presentation</h2>
+      <div class="form">
+        <div class="form-row">
+          <Select
+            name="visibility"
+            label="Visibility"
+            required
+            value={values.visibility}
+            options={[
+              { value: 'draft', label: 'Draft — hidden from the website' },
+              { value: 'published', label: 'Published — visible on the website' },
+            ]}
+            error={errors.visibility}
+          />
+          <Select
+            name="availability"
+            label="Availability"
+            required
+            value={values.availability}
+            options={Object.entries(AVAILABILITY).map(([value, a]) => ({ value, label: a.label }))}
+            hint="The product's status, shown as a badge. Visibility decides whether the page is on the website at all."
+            error={errors.availability}
+          />
+        </div>
+        <div class="form-row">
+          <Select
+            name="accent"
+            label="Accent colour"
+            required
+            value={values.accent}
+            options={ACCENTS.map((a) => ({ value: a.key, label: a.label }))}
+            hint="Used for the card edge and the artwork placeholder."
+            error={errors.accent}
+          />
+          <Field
+            name="sortOrder"
+            label="Sort order"
+            type="number"
+            value={values.sortOrder}
+            required
+            min={-999}
+            max={999}
+            hint="Lower numbers appear first."
+            error={errors.sortOrder}
+          />
+        </div>
+        <label class="choice">
+          <input type="checkbox" name="featured" checked={values.featured} />
+          <span>
+            <span class="choice__label">Featured</span>
+            <span class="choice__description">Featured products are listed first.</span>
+          </span>
+        </label>
+        <MediaPicker
+          name="artworkId"
+          legend="Artwork"
+          media={media}
+          selected={[values.artworkId]}
+          hint="Wide images (16:9) work best. Without artwork, a neutral placeholder is shown."
+          error={errors.artworkId}
+        />
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="compat-title">
+      <h2 id="compat-title">Compatibility</h2>
+      <div class="form">
+        <Field
+          name="minecraftVersions"
+          label="Minecraft versions"
+          value={values.minecraftVersions}
+          mono
+          hint="Comma-separated, e.g. 1.20.4, 1.21.x, 1.21+ or 26.1."
+          error={errors.minecraftVersions}
+        />
+        <Checkboxes
+          name="platforms"
+          legend="Platforms"
+          values={values.platforms}
+          options={PLATFORMS.map((p) => ({ value: p.key, label: p.label, description: p.kind }))}
+          error={errors.platforms}
+        />
+        <Field
+          name="javaVersion"
+          label="Java version"
+          value={values.javaVersion}
+          maxlength={3}
+          mono
+          hint="e.g. 21 or 17+"
+          error={errors.javaVersion}
+        />
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="links-title">
+      <h2 id="links-title">Links and dates</h2>
+      <div class="form">
+        <Field
+          name="builtbybitUrl"
+          label="BuiltByBit listing"
+          type="url"
+          value={values.builtbybitUrl}
+          maxlength={LIMITS.url}
+          hint="A builtbybit.com link. Shows “Buy on BuiltByBit” when the product is Available, otherwise “View on BuiltByBit”. Leave empty until the listing exists."
+          error={errors.builtbybitUrl}
+        />
+        <Field
+          name="externalDocsUrl"
+          label="External documentation"
+          type="url"
+          value={values.externalDocsUrl}
+          maxlength={LIMITS.url}
+          hint="Only if this product's docs live on another site. Docs written here are used first."
+          error={errors.externalDocsUrl}
+        />
+        <Field
+          name="supportUrl"
+          label="Support link"
+          type="url"
+          value={values.supportUrl}
+          maxlength={LIMITS.url}
+          hint="Overrides the site-wide Discord link for this product (e.g. a product-specific channel)."
+          error={errors.supportUrl}
+        />
+        <Field
+          name="launchedOn"
+          label="First released"
+          type="date"
+          value={values.launchedOn}
+          hint="Date of the first public release. Leave empty until the product has been released."
+          error={errors.launchedOn}
+        />
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="features-title">
+      <h2 id="features-title">Features</h2>
+      <p class="card__intro">Leave rows empty to remove them. Save to get more empty rows.</p>
+      {errors.features && <p class="field__error">{errors.features}</p>}
+      <div class="feature-rows">
+        {featureRows.map((feature, i) => (
+          <div class="feature-row">
+            <Field
+              name={`features.${i}.title`}
+              label={`Feature ${i + 1} title`}
+              value={feature.title}
+              maxlength={LIMITS.featureTitle}
+              error={errors[`features.${i}.title`]}
+            />
+            <Field
+              name={`features.${i}.body`}
+              label={`Feature ${i + 1} description`}
+              value={feature.body}
+              maxlength={LIMITS.featureBody}
+              error={errors[`features.${i}.body`]}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="screens-title">
+      <h2 id="screens-title">Screenshots</h2>
+      <MediaPicker
+        name="screenshotIds"
+        legend="Screenshots"
+        media={media}
+        selected={values.screenshotIds}
+        multiple
+        hint={`Up to ${LIMITS.maxScreenshots}. Shown in media library order.`}
+        error={errors.screenshotIds}
+      />
+    </section>
+
+    <div class="form-actions">
+      <button class="button button--primary" type="submit" name="intent" value="save">
+        {existing ? 'Save changes' : 'Create product'}
+      </button>
+      <a class="button" href="/staff/products">
+        Cancel
+      </a>
+      {existing && (
+        <a
+          class="button button--danger form-actions__end"
+          href={`/staff/products/${existing.id}/delete`}
+        >
+          Delete…
+        </a>
+      )}
+    </div>
+  </form>
+</StaffLayout>

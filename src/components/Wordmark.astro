@@ -1,0 +1,26 @@
+---
+/**
+ * The official Based Productions wordmark (off-white, for dark surfaces).
+ * The small variant is derived from the official logo by
+ * scripts/brand/process-logo.ts and imported so it gets a content-hashed,
+ * long-cached URL. Size it with CSS (height or width); the aspect ratio is fixed.
+ */
+import wordmark from '../assets/brand/wordmark-light-320.png?url';
+
+interface Props {
+  class?: string;
+  loading?: 'eager' | 'lazy';
+}
+
+const { class: className, loading = 'eager' } = Astro.props;
+---
+
+<img
+  src={wordmark}
+  width="320"
+  height="119"
+  alt="Based Productions"
+  class={className}
+  loading={loading}
+  decoding="async"
+/>

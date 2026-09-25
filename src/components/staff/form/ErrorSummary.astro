@@ -1,0 +1,38 @@
+---
+/**
+ * Lists validation errors at the top of a form, each linking to its field.
+ * role="alert" makes screen readers announce it when the page loads after a
+ * failed submission.
+ */
+import { fieldId } from './ids.ts';
+
+interface Props {
+  errors: Record<string, string>;
+  /** Human-readable names for field keys; unknown keys fall back to the key. */
+  labels?: Record<string, string>;
+}
+
+const { errors, labels = {} } = Astro.props;
+const entries = Object.entries(errors);
+const formError = errors._form;
+const fieldErrors = entries.filter(([key]) => key !== '_form');
+---
+
+{entries.length > 0 && (
+  <div class="notice notice--danger error-summary" role="alert">
+    <p class="error-summary__title">
+      {formError ?? `Please fix ${fieldErrors.length === 1 ? 'this problem' : 'these problems'}:`}
+    </p>
+    {fieldErrors.length > 0 && (
+      <ul>
+        {fieldErrors.map(([key, message]) => (
+          <li>
+            <a href={`#${fieldId(key)}`}>
+              {labels[key] ?? key}: {message}
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+)}

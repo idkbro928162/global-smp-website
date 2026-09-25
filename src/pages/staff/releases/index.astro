@@ -1,0 +1,95 @@
+---
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { RELEASE_CHANNELS, VISIBILITY } from '../../../lib/catalog.ts';
+import { formatDate } from '../../../lib/format.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { listProductOptions } from '../../../server/services/products.ts';
+import { listReleasesForStaff } from '../../../server/services/releases.ts';
+import { parseId, requirePermission } from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'releases.manage');
+const db = getDb();
+const productFilter = parseId(Astro.url.searchParams.get('product') ?? undefined) ?? undefined;
+const products = listProductOptions(db, actor);
+const releases = listReleasesForStaff(db, actor, { productId: productFilter });
+---
+
+<StaffLayout title="Releases">
+  <a
+    slot="actions"
+    class="button button--primary button--small"
+    href={productFilter ? `/staff/releases/new?product=${productFilter}` : '/staff/releases/new'}
+  >
+    New release
+  </a>
+
+  {products.length === 0 ? (
+    <div class="empty-state">
+      <h2>Create a product first</h2>
+      <p>
+        Releases belong to a product. <a href="/staff/products/new">Create a product</a> to start
+        publishing releases.
+      </p>
+    </div>
+  ) : (
+    <>
+      <form method="get" class="filter">
+        <label for="product-filter">Product</label>
+        <select id="product-filter" name="product">
+          <option value="">All products</option>
+          {products.map((p) => (
+            <option value={p.id} selected={p.id === productFilter}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <button class="button button--small" type="submit">
+          Filter
+        </button>
+      </form>
+      {releases.length === 0 ? (
+        <div class="empty-state">
+          <p>No releases yet.</p>
+        </div>
+      ) : (
+        <div class="table-wrap">
+          <table class="data-table">
+            <caption class="visually-hidden">Releases</caption>
+            <thead>
+              <tr>
+                <th scope="col">Version</th>
+                <th scope="col">Product</th>
+                <th scope="col">Channel</th>
+                <th scope="col">Released</th>
+                <th scope="col">Visibility</th>
+              </tr>
+            </thead>
+            <tbody>
+              {releases.map((release) => (
+                <tr>
+                  <td class="data-table__primary mono">
+                    <a href={`/staff/releases/${release.id}`}>{release.version}</a>
+                    {release.title && <span class="data-table__secondary">{release.title}</span>}
+                  </td>
+                  <td>{release.productName}</td>
+                  <td>{RELEASE_CHANNELS[release.channel]}</td>
+                  <td class="nowrap">{formatDate(release.releasedOn)}</td>
+                  <td>
+                    <span
+                      class:list={[
+                        'badge',
+                        { 'badge--positive': release.visibility === 'published' },
+                      ]}
+                    >
+                      {VISIBILITY[release.visibility]}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )}
+</StaffLayout>

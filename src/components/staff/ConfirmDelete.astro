@@ -1,0 +1,58 @@
+---
+/**
+ * Delete confirmation (a separate page rather than a JavaScript dialog, so it
+ * works without scripts and cannot be triggered by a stray click).
+ */
+import CsrfField from './form/CsrfField.astro';
+
+interface Props {
+  subject: string;
+  cancelHref: string;
+  consequences?: string[];
+  error?: string | undefined;
+}
+
+const { subject, cancelHref, consequences = [], error } = Astro.props;
+---
+
+<div class="card card--danger confirm">
+  {error && (
+    <div class="notice notice--danger" role="alert">
+      {error}
+    </div>
+  )}
+  <p>
+    Delete <strong>{subject}</strong>? This cannot be undone.
+  </p>
+  {consequences.length > 0 && (
+    <ul class="confirm__list">
+      {consequences.map((item) => (
+        <li>{item}</li>
+      ))}
+    </ul>
+  )}
+  <form method="post" class="button-row">
+    <CsrfField />
+    <button class="button button--danger" type="submit">
+      Delete permanently
+    </button>
+    <a class="button" href={cancelHref}>
+      Cancel
+    </a>
+  </form>
+</div>
+
+<style>
+  .confirm {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    max-width: 40rem;
+  }
+
+  .confirm__list {
+    padding-left: 1.2em;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+</style>

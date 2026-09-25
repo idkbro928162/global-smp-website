@@ -1,0 +1,37 @@
+/*
+ * Curated product accents (see src/lib/catalog.ts ACCENTS). Accents colour
+ * product artwork frames and placeholders only — never body text — so the
+ * brand itself stays monochrome.
+ */
+.accent-neutral {
+  --accent: #8a8983;
+  --accent-deep: #1c1c20;
+}
+.accent-redstone {
+  --accent: #e5484d;
+  --accent-deep: #2b1113;
+}
+.accent-copper {
+  --accent: #dd7a4a;
+  --accent-deep: #2a170e;
+}
+.accent-gold {
+  --accent: #e8b64c;
+  --accent-deep: #29200c;
+}
+.accent-emerald {
+  --accent: #3fcf7a;
+  --accent-deep: #0e2518;
+}
+.accent-diamond {
+  --accent: #4cc9dd;
+  --accent-deep: #0c2327;
+}
+.accent-lapis {
+  --accent: #5b7cfa;
+  --accent-deep: #121a36;
+}
+.accent-amethyst {
+  --accent: #a77bf3;
+  --accent-deep: #1f1533;
+}

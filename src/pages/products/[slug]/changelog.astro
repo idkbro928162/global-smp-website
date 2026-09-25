@@ -1,0 +1,48 @@
+---
+import PageHeader from '../../../components/PageHeader.astro';
+import ReleaseEntry from '../../../components/products/ReleaseEntry.astro';
+import SiteLayout from '../../../layouts/SiteLayout.astro';
+import { getDb } from '../../../server/db/client.ts';
+import { getPublishedProduct } from '../../../server/services/products.ts';
+import { listPublishedReleasesForProduct } from '../../../server/services/releases.ts';
+
+const db = getDb();
+const product = getPublishedProduct(db, Astro.params.slug ?? '');
+if (!product) return Astro.rewrite('/404');
+const releases = listPublishedReleasesForProduct(db, product.id);
+---
+
+<SiteLayout
+  title={`${product.name} changelog`}
+  description={`Release history for ${product.name} by Based Productions.`}
+>
+  <PageHeader
+    eyebrow="Changelog"
+    title={`${product.name} changelog`}
+    breadcrumbs={[
+      { href: '/products', label: 'Products' },
+      { href: `/products/${product.slug}`, label: product.name },
+    ]}
+  />
+  <div class="container changelog">
+    {releases.length > 0 ? (
+      releases.map((release) => <ReleaseEntry release={release} />)
+    ) : (
+      <div class="empty-state">
+        <h2>No releases published yet</h2>
+        <p>Release notes for {product.name} will appear here with each new version.</p>
+      </div>
+    )}
+  </div>
+</SiteLayout>
+
+<style>
+  .changelog {
+    max-width: calc(52rem + 2 * var(--gutter));
+    padding-block: var(--space-5) var(--space-9);
+  }
+
+  .empty-state {
+    margin-top: var(--space-6);
+  }
+</style>

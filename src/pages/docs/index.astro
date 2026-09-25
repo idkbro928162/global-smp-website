@@ -1,0 +1,140 @@
+---
+import Icon from '../../components/Icon.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import { pluralize } from '../../lib/format.ts';
+import { getDb } from '../../server/db/client.ts';
+import { listDocCollections } from '../../server/services/docs.ts';
+
+const collections = listDocCollections(getDb());
+---
+
+<SiteLayout
+  title="Documentation"
+  description="Installation, configuration and usage guides for Based Productions products."
+>
+  <PageHeader
+    eyebrow="Documentation"
+    title="Documentation"
+    lead="Installation, configuration and usage guides for each Based Productions product."
+  />
+  <div class="container docs-index">
+    {collections.length > 0 ? (
+      <ul class="collections">
+        {collections.map((collection) => {
+          const internal = collection.pages.length > 0;
+          return (
+            <li class="collection">
+              <h2>
+                <a href={internal ? `/docs/${collection.key}` : collection.externalUrl}>
+                  {collection.title}
+                  {!internal && (
+                    <>
+                      <Icon name="external" size={14} />
+                      <span class="visually-hidden">(external site)</span>
+                    </>
+                  )}
+                </a>
+              </h2>
+              {collection.description && <p>{collection.description}</p>}
+              <p class="collection__meta mono">
+                {internal ? pluralize(collection.pages.length, 'page') : 'Hosted externally'}
+              </p>
+              {internal && (
+                <ul class="collection__pages">
+                  {collection.pages.slice(0, 4).map((page) => (
+                    <li>
+                      <a href={`/docs/${collection.key}/${page.slug}`}>{page.title}</a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    ) : (
+      <div class="empty-state">
+        <h2>No documentation published yet</h2>
+        <p>
+          Guides will be published here alongside each product. If you need help in the meantime,
+          see <a href="/support">Support</a>.
+        </p>
+      </div>
+    )}
+  </div>
+</SiteLayout>
+
+<style>
+  .docs-index {
+    padding-block: var(--space-7) var(--space-9);
+  }
+
+  .collections {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-5);
+    list-style: none;
+    padding: 0;
+  }
+
+  .collection {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+
+  .collection:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .collection h2 {
+    font-size: var(--text-lg);
+  }
+
+  .collection h2 a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-decoration: none;
+  }
+
+  .collection h2 a:hover {
+    text-decoration: underline;
+  }
+
+  .collection > p {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .collection__meta {
+    font-size: var(--text-xs) !important;
+    color: var(--color-text-subtle) !important;
+  }
+
+  .collection__pages {
+    margin-top: var(--space-2);
+    padding: var(--space-3) 0 0;
+    border-top: 1px solid var(--color-border);
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .collection__pages a {
+    display: block;
+    padding-block: 0.3rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+  }
+
+  .collection__pages a:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+  }
+</style>

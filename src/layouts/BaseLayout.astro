@@ -1,0 +1,54 @@
+---
+import '../styles/global.css';
+import '../styles/accents.css';
+import '../styles/prose.css';
+import archivoLatin from '@fontsource-variable/archivo/files/archivo-latin-wght-normal.woff2?url';
+import { getConfig } from '../server/config.ts';
+
+interface Props {
+  /** Page title without the site name. */
+  title: string;
+  description?: string;
+  /** Social preview image, as a site-relative path. */
+  image?: string;
+  noindex?: boolean;
+}
+
+const { title, description, image = '/brand/og-default.png', noindex = false } = Astro.props;
+const { siteUrl } = getConfig();
+const fullTitle = title ? `${title} · Based Productions` : 'Based Productions';
+// Canonical URLs ignore query strings and always use the configured origin.
+const canonical = new URL(Astro.url.pathname, siteUrl).toString();
+const imageUrl = new URL(image, siteUrl).toString();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    {description && <meta name="description" content={description} />}
+    {noindex ? (
+      <meta name="robots" content="noindex, nofollow" />
+    ) : (
+      <link rel="canonical" href={canonical} />
+    )}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Based Productions" />
+    <meta property="og:title" content={fullTitle} />
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={imageUrl} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#0a0a0b" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href={archivoLatin} as="font" type="font/woff2" crossorigin />
+    <slot name="head" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

@@ -1,0 +1,61 @@
+---
+import { fieldId } from './ids.ts';
+
+interface Option {
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}
+
+interface Props {
+  name: string;
+  legend: string;
+  options: Option[];
+  values?: readonly string[];
+  error?: string | undefined;
+  hint?: string;
+  columns?: boolean;
+}
+
+const { name, legend, options, values = [], error, hint, columns = true } = Astro.props;
+const id = fieldId(name);
+const hintId = hint ? `${id}-hint` : undefined;
+const errorId = error ? `${id}-error` : undefined;
+const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+---
+
+<fieldset
+  class:list={['field', 'choices', { 'field--invalid': error }]}
+  id={id}
+  aria-describedby={describedBy}
+>
+  <legend>{legend}</legend>
+  {hint && (
+    <p class="field__hint" id={hintId}>
+      {hint}
+    </p>
+  )}
+  <div class:list={['choices__list', { 'choices__list--columns': columns }]}>
+    {options.map((option) => (
+      <label class="choice">
+        <input
+          type="checkbox"
+          name={name}
+          value={option.value}
+          checked={values.includes(option.value)}
+          disabled={option.disabled}
+        />
+        <span>
+          <span class="choice__label">{option.label}</span>
+          {option.description && <span class="choice__description">{option.description}</span>}
+        </span>
+      </label>
+    ))}
+  </div>
+  {error && (
+    <p class="field__error" id={errorId}>
+      {error}
+    </p>
+  )}
+</fieldset>

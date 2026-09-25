@@ -1,0 +1,26 @@
+---
+import ConfirmDelete from '../../../../components/staff/ConfirmDelete.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { getDb } from '../../../../server/db/client.ts';
+import { deleteTeamMember, getTeamMemberForStaff } from '../../../../server/services/team.ts';
+import { mutationContext, parseId, requirePermission } from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'team.manage');
+const db = getDb();
+const id = parseId(Astro.params.id);
+if (id === null) return Astro.rewrite('/404');
+const member = getTeamMemberForStaff(db, actor, id);
+
+if (Astro.request.method === 'POST') {
+  deleteTeamMember(db, mutationContext(Astro), id);
+  return Astro.redirect('/staff/team?notice=deleted', 303);
+}
+---
+
+<StaffLayout title="Delete team profile" back={{ href: `/staff/team/${id}`, label: member.name }}>
+  <ConfirmDelete
+    subject={member.name}
+    cancelHref={`/staff/team/${id}`}
+    consequences={['The profile is removed from the About page. Staff accounts are not affected.']}
+  />
+</StaffLayout>

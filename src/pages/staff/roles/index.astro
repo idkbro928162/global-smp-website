@@ -1,0 +1,60 @@
+---
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { ALL_PERMISSIONS } from '../../../server/auth/permissions.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { listRoles, roleEditBlocker } from '../../../server/services/roles.ts';
+import { requirePermission } from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'roles.manage');
+const roles = listRoles(getDb(), actor);
+---
+
+<StaffLayout title="Roles">
+  <a slot="actions" class="button button--primary button--small" href="/staff/roles/new">
+    New role
+  </a>
+  <p class="intro muted">
+    A role is a named set of permissions. You can only grant permissions you hold, and you cannot
+    change your own role or the Owner role.
+  </p>
+  <div class="table-wrap">
+    <table class="data-table">
+      <caption class="visually-hidden">Roles</caption>
+      <thead>
+        <tr>
+          <th scope="col">Role</th>
+          <th scope="col">Permissions</th>
+          <th scope="col">Members</th>
+          <th scope="col">
+            <span class="visually-hidden">Editable</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {roles.map((role) => {
+          const blocker = roleEditBlocker(actor, role);
+          return (
+            <tr>
+              <td class="data-table__primary">
+                <a href={`/staff/roles/${role.id}`}>{role.name}</a>
+                {role.description && <span class="data-table__secondary">{role.description}</span>}
+              </td>
+              <td class="mono nowrap">
+                {role.isOwner ? 'All' : `${role.permissions.length} / ${ALL_PERMISSIONS.length}`}
+              </td>
+              <td class="mono">{role.memberCount}</td>
+              <td class="subtle">{blocker ? 'Read only' : ''}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</StaffLayout>
+
+<style>
+  .intro {
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+  }
+</style>

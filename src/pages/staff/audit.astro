@@ -1,0 +1,137 @@
+---
+import StaffLayout from '../../layouts/StaffLayout.astro';
+import { formatDateTime } from '../../lib/format.ts';
+import { getDb } from '../../server/db/client.ts';
+import { listAuditEvents } from '../../server/services/audit.ts';
+import { requirePermission } from '../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'audit.view');
+const pageParam = Number(Astro.url.searchParams.get('page') ?? '1');
+const filter = Astro.url.searchParams.get('action') ?? '';
+const result = listAuditEvents(getDb(), actor, {
+  page: Number.isFinite(pageParam) ? pageParam : 1,
+  actionPrefix: filter,
+});
+
+const FILTERS = [
+  { value: '', label: 'All actions' },
+  { value: 'auth.', label: 'Sign-ins and passwords' },
+  { value: 'staff.', label: 'Staff accounts' },
+  { value: 'role.', label: 'Roles' },
+  { value: 'settings.', label: 'Settings' },
+  { value: 'product.', label: 'Products' },
+  { value: 'release.', label: 'Releases' },
+  { value: 'doc.', label: 'Documentation' },
+  { value: 'content.', label: 'Site copy' },
+  { value: 'service.', label: 'Services' },
+  { value: 'team.', label: 'Team page' },
+  { value: 'media.', label: 'Media' },
+];
+
+const pageHref = (page: number) => {
+  const params = new URLSearchParams();
+  if (filter) params.set('action', filter);
+  if (page > 1) params.set('page', String(page));
+  const query = params.toString();
+  return `/staff/audit${query ? `?${query}` : ''}`;
+};
+
+function describeDetails(details: Record<string, unknown> | null): string {
+  if (!details) return '';
+  return Object.entries(details)
+    .filter(
+      ([, value]) =>
+        value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0),
+    )
+    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`)
+    .join(' · ');
+}
+---
+
+<StaffLayout title="Audit log">
+  <p class="intro muted">
+    An append-only record of administrative actions. Entries cannot be edited or deleted from the
+    panel. Times are UTC.
+  </p>
+  <form method="get" class="filter">
+    <label for="audit-filter">Show</label>
+    <select id="audit-filter" name="action">
+      {FILTERS.map((f) => (
+        <option value={f.value} selected={f.value === filter}>
+          {f.label}
+        </option>
+      ))}
+    </select>
+    <button class="button button--small" type="submit">
+      Filter
+    </button>
+    <span class="subtle count">{result.total} entries</span>
+  </form>
+  {result.events.length === 0 ? (
+    <div class="empty-state">
+      <p>No entries.</p>
+    </div>
+  ) : (
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption class="visually-hidden">Audit log entries</caption>
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Who</th>
+            <th scope="col">Action</th>
+            <th scope="col">Target</th>
+            <th scope="col">Details</th>
+            <th scope="col">IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {result.events.map((event) => (
+            <tr>
+              <td class="nowrap subtle">{formatDateTime(event.at)}</td>
+              <td>{event.actorLabel}</td>
+              <td class="mono">{event.action}</td>
+              <td>{event.targetLabel ?? (event.targetType ? event.targetType : '—')}</td>
+              <td class="subtle details">{describeDetails(event.details)}</td>
+              <td class="mono subtle">{event.ip ?? ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+  <nav class="pager" aria-label="Audit log pages">
+    {result.page > 1 && (
+      <a class="button button--small" href={pageHref(result.page - 1)}>
+        Newer
+      </a>
+    )}
+    {result.hasMore && (
+      <a class="button button--small" href={pageHref(result.page + 1)}>
+        Older
+      </a>
+    )}
+  </nav>
+</StaffLayout>
+
+<style>
+  .intro {
+    margin-bottom: var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .count {
+    margin-left: auto;
+  }
+
+  .details {
+    min-width: 12rem;
+    font-size: var(--text-xs);
+  }
+
+  .pager {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+  }
+</style>

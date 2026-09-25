@@ -1,0 +1,83 @@
+---
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { VISIBILITY } from '../../../lib/catalog.ts';
+import { formatDate } from '../../../lib/format.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { GENERAL_COLLECTION, listDocPagesForStaff } from '../../../server/services/docs.ts';
+import { requirePermission } from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'docs.manage');
+const pages = listDocPagesForStaff(getDb(), actor);
+const groups = new Map<string, typeof pages>();
+for (const page of pages) {
+  const key = page.productName ?? 'General documentation';
+  groups.set(key, [...(groups.get(key) ?? []), page]);
+}
+---
+
+<StaffLayout title="Documentation">
+  <a slot="actions" class="button button--primary button--small" href="/staff/docs/new">
+    New page
+  </a>
+  {pages.length === 0 ? (
+    <div class="empty-state">
+      <h2>No documentation pages yet</h2>
+      <p>
+        Pages can belong to a product (listed under /docs/&lt;product&gt;) or to the general
+        collection.
+      </p>
+    </div>
+  ) : (
+    [...groups].map(([group, list]) => (
+      <section class="doc-group" aria-label={group}>
+        <h2>{group}</h2>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Page</th>
+                <th scope="col">Section</th>
+                <th scope="col">Order</th>
+                <th scope="col">Visibility</th>
+                <th scope="col">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((page) => (
+                <tr>
+                  <td class="data-table__primary">
+                    <a href={`/staff/docs/${page.id}`}>{page.title}</a>
+                    <span class="data-table__secondary mono">
+                      /docs/{page.productSlug ?? GENERAL_COLLECTION}/{page.slug}
+                    </span>
+                  </td>
+                  <td>{page.section || <span class="subtle">—</span>}</td>
+                  <td class="mono">{page.sortOrder}</td>
+                  <td>
+                    <span
+                      class:list={['badge', { 'badge--positive': page.visibility === 'published' }]}
+                    >
+                      {VISIBILITY[page.visibility]}
+                    </span>
+                  </td>
+                  <td class="nowrap subtle">{formatDate(page.updatedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    ))
+  )}
+</StaffLayout>
+
+<style>
+  .doc-group + .doc-group {
+    margin-top: var(--space-7);
+  }
+
+  .doc-group h2 {
+    margin-bottom: var(--space-3);
+    font-size: var(--text-lg);
+  }
+</style>

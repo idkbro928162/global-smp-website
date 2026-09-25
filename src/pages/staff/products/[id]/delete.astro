@@ -1,0 +1,44 @@
+---
+import ConfirmDelete from '../../../../components/staff/ConfirmDelete.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { pluralize } from '../../../../lib/format.ts';
+import { getDb } from '../../../../server/db/client.ts';
+import {
+  deleteProduct,
+  getProductForStaff,
+  productDependents,
+} from '../../../../server/services/products.ts';
+import { mutationContext, parseId, requirePermission } from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'products.manage');
+const db = getDb();
+const id = parseId(Astro.params.id);
+if (id === null) return Astro.rewrite('/404');
+const product = getProductForStaff(db, actor, id);
+
+if (Astro.request.method === 'POST') {
+  deleteProduct(db, mutationContext(Astro), id);
+  return Astro.redirect('/staff/products?notice=deleted', 303);
+}
+
+const dependents = productDependents(db, actor, id);
+const consequences = [
+  'The product page and its changelog are removed from the website immediately.',
+  ...(dependents.releases > 0
+    ? [`${pluralize(dependents.releases, 'release')} will also be deleted.`]
+    : []),
+  ...(dependents.docPages > 0
+    ? [`${pluralize(dependents.docPages, 'documentation page')} will also be deleted.`]
+    : []),
+  'Images stay in the media library.',
+  'Consider setting the product to Draft instead if you may need it again.',
+];
+---
+
+<StaffLayout title="Delete product" back={{ href: `/staff/products/${id}`, label: product.name }}>
+  <ConfirmDelete
+    subject={product.name}
+    cancelHref={`/staff/products/${id}`}
+    consequences={consequences}
+  />
+</StaffLayout>

@@ -1,0 +1,16 @@
+---
+import { AVAILABILITY } from '../../lib/catalog.ts';
+import type { Availability } from '../../server/db/schema.ts';
+
+interface Props {
+  availability: Availability;
+}
+
+const { availability } = Astro.props;
+const { label, tone } = AVAILABILITY[availability];
+---
+
+<span class={`badge badge--${tone}`}>
+  <span class="status-dot" aria-hidden="true"></span>
+  {label}
+</span>

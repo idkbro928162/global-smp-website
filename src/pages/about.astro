@@ -1,0 +1,180 @@
+---
+import Icon from '../components/Icon.astro';
+import Markdown from '../components/Markdown.astro';
+import PageHeader from '../components/PageHeader.astro';
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { markdownToText, renderMarkdown } from '../lib/markdown.ts';
+import { getDb } from '../server/db/client.ts';
+import { getContent } from '../server/services/site.ts';
+import { listPublishedTeam } from '../server/services/team.ts';
+
+const db = getDb();
+const content = getContent(db);
+const about = renderMarkdown(content['about.body'], { baseLevel: 2 });
+const team = listPublishedTeam(db);
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+---
+
+<SiteLayout
+  title="About"
+  description={markdownToText(content['about.body']) || 'About Based Productions.'}
+>
+  <PageHeader eyebrow="About" title="About Based Productions" />
+
+  <div class="container about">
+    {content['about.body'] && <Markdown html={about.html} class="about__body" />}
+
+    <section id="team" class="team" aria-labelledby="team-title">
+      <h2 id="team-title">Team</h2>
+      {team.length > 0 ? (
+        <ul class="team__grid">
+          {team.map((member) => (
+            <li class="member">
+              {member.avatar ? (
+                <img
+                  class="member__avatar"
+                  src={member.avatar.smallUrl}
+                  width="96"
+                  height="96"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <span class="member__avatar member__avatar--initials" aria-hidden="true">
+                  {initials(member.name)}
+                </span>
+              )}
+              <div class="member__body">
+                <h3>{member.name}</h3>
+                {member.roleTitle && <p class="member__role mono">{member.roleTitle}</p>}
+                {member.bio && <p class="member__bio">{member.bio}</p>}
+                {member.links.length > 0 && (
+                  <ul class="member__links" aria-label={`${member.name} elsewhere`}>
+                    {member.links.map((link) => (
+                      <li>
+                        <a href={link.url}>
+                          {link.label} <Icon name="external" size={12} />
+                          <span class="visually-hidden">(external site)</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div class="empty-state">
+          <p>Team profiles have not been published yet.</p>
+        </div>
+      )}
+    </section>
+  </div>
+</SiteLayout>
+
+<style>
+  .about {
+    padding-block: var(--space-7) var(--space-9);
+  }
+
+  /* Rendered by the Markdown component, so outside this file's style scope. */
+  .about :global(.about__body) {
+    font-size: var(--text-lg);
+    line-height: 1.6;
+  }
+
+  .team {
+    margin-top: var(--space-8);
+    padding-top: var(--space-7);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .team h2 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-5);
+  }
+
+  .team__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-5);
+    list-style: none;
+    padding: 0;
+  }
+
+  .member {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    min-width: 0;
+  }
+
+  .member__avatar {
+    flex: none;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: var(--radius);
+    object-fit: cover;
+    background: var(--color-surface-3);
+  }
+
+  .member__avatar--initials {
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .member__body {
+    min-width: 0;
+  }
+
+  .member h3 {
+    font-size: var(--text-md);
+  }
+
+  .member__role {
+    margin-top: var(--space-1);
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .member__bio {
+    margin-top: var(--space-3);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .member__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    margin-top: var(--space-3);
+    list-style: none;
+    padding: 0;
+    font-size: var(--text-sm);
+  }
+
+  .member__links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    min-height: 2rem;
+  }
+</style>

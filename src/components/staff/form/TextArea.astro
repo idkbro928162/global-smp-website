@@ -1,0 +1,89 @@
+---
+import type { SafeHtml } from '../../../lib/markdown.ts';
+import Markdown from '../../Markdown.astro';
+import { fieldId } from './ids.ts';
+
+interface Props {
+  name: string;
+  label: string;
+  value?: string;
+  error?: string | undefined;
+  hint?: string;
+  required?: boolean;
+  maxlength?: number;
+  rows?: number;
+  /** Markdown fields use a monospace editor and can show a server-rendered preview. */
+  markdown?: boolean;
+  preview?: SafeHtml | null;
+}
+
+const {
+  name,
+  label,
+  value = '',
+  error,
+  hint,
+  required = false,
+  maxlength,
+  rows = 6,
+  markdown = false,
+  preview = null,
+} = Astro.props;
+const id = fieldId(name);
+const hintId = hint || markdown ? `${id}-hint` : undefined;
+const errorId = error ? `${id}-error` : undefined;
+const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+---
+
+<div class:list={['field', { 'field--invalid': error }]}>
+  <label for={id}>
+    {label}
+    {!required && <span class="field__optional">optional</span>}
+  </label>
+  {(hint || markdown) && (
+    <p class="field__hint" id={hintId}>
+      {hint}
+      {markdown && (
+        <>
+          {hint && ' '}Markdown: <code>## Heading</code>, <code>**bold**</code>,{' '}
+          <code>[link](https://…)</code>, <code>```yaml</code> code blocks. Raw HTML is not
+          rendered.
+        </>
+      )}
+    </p>
+  )}
+  <textarea
+    id={id}
+    name={name}
+    rows={rows}
+    required={required}
+    maxlength={maxlength}
+    aria-invalid={error ? 'true' : undefined}
+    aria-describedby={describedBy}
+    class:list={{ mono: markdown }}
+    spellcheck={markdown ? 'true' : undefined}
+  >{value}</textarea>
+  {error && (
+    <p class="field__error" id={errorId}>
+      {error}
+    </p>
+  )}
+  {markdown && (
+    <div class="field__preview-row">
+      <button class="button button--small" type="submit" name="intent" value="preview">
+        Preview
+      </button>
+      <span class="field__hint">Shows a preview below without saving.</span>
+    </div>
+  )}
+  {preview !== null && (
+    <section class="markdown-preview" aria-label={`Preview of ${label}`}>
+      <p class="markdown-preview__label">Preview — not saved yet</p>
+      {preview.trim() ? (
+        <Markdown html={preview} compact />
+      ) : (
+        <p class="subtle">Nothing to preview.</p>
+      )}
+    </section>
+  )}
+</div>

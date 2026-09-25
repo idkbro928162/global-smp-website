@@ -1,0 +1,102 @@
+---
+import PageHeader from '../../components/PageHeader.astro';
+import ProductCard from '../../components/products/ProductCard.astro';
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import { getDb } from '../../server/db/client.ts';
+import { listPublishedProducts } from '../../server/services/products.ts';
+import { getSettings } from '../../server/services/site.ts';
+import Icon from '../../components/Icon.astro';
+
+const db = getDb();
+const products = listPublishedProducts(db);
+const storeUrl = getSettings(db)['links.builtbybit'];
+const groups = [
+  {
+    key: 'available',
+    title: 'Available now',
+    items: products.filter((p) => p.availability === 'available'),
+  },
+  {
+    key: 'in_development',
+    title: 'In development',
+    items: products.filter((p) => p.availability === 'in_development'),
+  },
+  {
+    key: 'discontinued',
+    title: 'Discontinued',
+    items: products.filter((p) => p.availability === 'discontinued'),
+  },
+].filter((group) => group.items.length > 0);
+---
+
+<SiteLayout
+  title="Products"
+  description="Minecraft plugins and server software by Based Productions, sold on BuiltByBit."
+>
+  <PageHeader
+    eyebrow="Products"
+    title="Plugins and server software"
+    lead="Every product is sold and delivered through BuiltByBit. Documentation and changelogs live here."
+  >
+    {storeUrl && (
+      <div class="button-row header-actions">
+        <a class="button" href={storeUrl}>
+          Our BuiltByBit store <Icon name="external" class="button__icon" />
+          <span class="visually-hidden">(external site)</span>
+        </a>
+      </div>
+    )}
+  </PageHeader>
+
+  <div class="container page-body">
+    {groups.length === 0 ? (
+      <div class="empty-state">
+        <h2>No products published yet</h2>
+        <p>
+          The catalogue is empty for now. Products will be listed here, with documentation and
+          changelogs, as they are released.
+        </p>
+      </div>
+    ) : (
+      groups.map((group) => (
+        <section class="group" aria-labelledby={`group-${group.key}`}>
+          <h2 id={`group-${group.key}`} class="group__title">
+            {group.title} <span class="mono subtle">{group.items.length}</span>
+          </h2>
+          <div class="product-grid">
+            {group.items.map((product) => (
+              <ProductCard product={product} />
+            ))}
+          </div>
+        </section>
+      ))
+    )}
+  </div>
+</SiteLayout>
+
+<style>
+  .header-actions {
+    margin-top: var(--space-5);
+  }
+
+  .page-body {
+    padding-block: var(--space-7) var(--space-9);
+  }
+
+  .group + .group {
+    margin-top: var(--space-8);
+  }
+
+  .group__title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+    font-size: var(--text-xl);
+  }
+
+  .group__title .mono {
+    font-size: var(--text-sm);
+    font-weight: 400;
+  }
+</style>

@@ -1,0 +1,63 @@
+{
+  "name": "based-productions-website",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Official Based Productions website and private staff platform.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env ./node_modules/astro/bin/astro.mjs dev",
+    "build": "astro build",
+    "vercel-build": "node scripts/vercel-preview-seed.ts && astro build",
+    "start": "node --env-file-if-exists=.env ./dist/server/entry.mjs",
+    "preview": "astro preview",
+    "check": "astro check",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "astro build && vitest run --project integration",
+    "test:e2e": "astro build && playwright test",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
+    "staff:create-owner": "node --env-file-if-exists=.env scripts/create-owner.ts",
+    "demo:seed": "node --env-file-if-exists=.env scripts/seed-demo.ts",
+    "verify": "npm run format:check && npm run lint && npm run check && npm run test",
+    "brand:process-logo": "node scripts/brand/process-logo.ts"
+  },
+  "dependencies": {
+    "@astrojs/node": "^11.1.6",
+    "@astrojs/vercel": "^11.0.11",
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "astro": "^7.3.5",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.3",
+    "highlight.js": "^11.12.0",
+    "markdown-it": "^15.0.2",
+    "sharp": "^0.35.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.0",
+    "@playwright/test": "1.56.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.20.4",
+    "eslint": "^10.11.0",
+    "eslint-plugin-astro": "^3.2.1",
+    "eslint-plugin-jsx-a11y-x": "^0.2.0",
+    "globals": "^17.0.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-astro": "^1.0.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "playwright-core": "1.56.1"
+  }
+}

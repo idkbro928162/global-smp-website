@@ -1,0 +1,120 @@
+---
+import Icon from '../../../components/Icon.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import SiteLayout from '../../../layouts/SiteLayout.astro';
+import { getDb } from '../../../server/db/client.ts';
+import { getDocCollection, groupIntoSections } from '../../../server/services/docs.ts';
+
+const collection = getDocCollection(getDb(), Astro.params.collection ?? '');
+if (!collection) return Astro.rewrite('/404');
+const sections = groupIntoSections(collection.pages);
+---
+
+<SiteLayout
+  title={`${collection.title} documentation`}
+  description={collection.description || `Documentation for ${collection.title}.`}
+>
+  <PageHeader
+    eyebrow="Documentation"
+    title={collection.title}
+    lead={collection.description || undefined}
+    breadcrumbs={[{ href: '/docs', label: 'Docs' }]}
+  >
+    {collection.productId !== null && (
+      <div class="button-row header-actions">
+        <a class="button button--small" href={`/products/${collection.key}`}>
+          Product page
+        </a>
+        {collection.externalUrl && (
+          <a class="button button--small" href={collection.externalUrl}>
+            External documentation <Icon name="external" size={14} />
+            <span class="visually-hidden">(external site)</span>
+          </a>
+        )}
+      </div>
+    )}
+  </PageHeader>
+
+  <div class="container collection-body">
+    {sections.length > 0 ? (
+      sections.map((section) => (
+        <section class="doc-section" aria-label={section.title || 'Pages'}>
+          {section.title && <h2>{section.title}</h2>}
+          <ul>
+            {section.pages.map((page) => (
+              <li>
+                <a href={`/docs/${collection.key}/${page.slug}`}>
+                  <span class="doc-section__title">{page.title}</span>
+                  {page.summary && <span class="doc-section__summary">{page.summary}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    ) : (
+      <div class="empty-state">
+        <p>
+          This product's documentation is hosted on another site.{' '}
+          <a href={collection.externalUrl}>Open the documentation</a>.
+        </p>
+      </div>
+    )}
+  </div>
+</SiteLayout>
+
+<style>
+  .header-actions {
+    margin-top: var(--space-5);
+  }
+
+  .collection-body {
+    max-width: calc(52rem + 2 * var(--gutter));
+    padding-block: var(--space-7) var(--space-9);
+  }
+
+  .doc-section + .doc-section {
+    margin-top: var(--space-7);
+  }
+
+  .doc-section h2 {
+    margin-bottom: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+  }
+
+  .doc-section ul {
+    list-style: none;
+    padding: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .doc-section li {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .doc-section a {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4) var(--space-2);
+    text-decoration: none;
+  }
+
+  .doc-section a:hover {
+    background: var(--color-surface);
+  }
+
+  .doc-section__title {
+    font-weight: 650;
+  }
+
+  .doc-section__summary {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+</style>

@@ -1,0 +1,164 @@
+---
+/** Create (/staff/roles/new) or view/edit/delete (/staff/roles/<id>) a role. */
+import CsrfField from '../../../components/staff/form/CsrfField.astro';
+import Checkboxes from '../../../components/staff/form/Checkboxes.astro';
+import ErrorSummary from '../../../components/staff/form/ErrorSummary.astro';
+import Field from '../../../components/staff/form/Field.astro';
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { ALL_PERMISSIONS, PERMISSIONS } from '../../../server/auth/permissions.ts';
+import { getDb } from '../../../server/db/client.ts';
+import {
+  createRole,
+  deleteRole,
+  getRole,
+  roleEditBlocker,
+  updateRole,
+} from '../../../server/services/roles.ts';
+import {
+  field,
+  fields,
+  mutationContext,
+  parseId,
+  requirePermission,
+  submittedForm,
+} from '../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'roles.manage');
+const db = getDb();
+const isNew = Astro.params.id === 'new';
+const id = isNew ? null : parseId(Astro.params.id);
+if (!isNew && id === null) return Astro.rewrite('/404');
+
+const existing = id !== null ? getRole(db, actor, id) : null;
+const blocker = existing ? roleEditBlocker(actor, existing) : null;
+let values = {
+  name: existing?.name ?? '',
+  description: existing?.description ?? '',
+  permissions: existing?.permissions ?? (['panel.access'] as string[]),
+};
+let errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  const ctx = mutationContext(Astro);
+  if (field(form, 'intent') === 'delete' && id !== null) {
+    const result = deleteRole(db, ctx, id);
+    if (result.ok) return Astro.redirect('/staff/roles?notice=deleted', 303);
+    errors = result.errors;
+  } else {
+    values = {
+      name: field(form, 'name'),
+      description: field(form, 'description'),
+      permissions: fields(form, 'permissions'),
+    };
+    const result = id === null ? createRole(db, ctx, values) : updateRole(db, ctx, id, values);
+    if (result.ok) {
+      return Astro.redirect(
+        `/staff/roles/${result.value.id}?notice=${id === null ? 'created' : 'saved'}`,
+        303,
+      );
+    }
+    errors = result.errors;
+  }
+}
+
+const options = ALL_PERMISSIONS.map((permission) => ({
+  value: permission,
+  label: PERMISSIONS[permission].label,
+  description: actor.permissions.has(permission)
+    ? PERMISSIONS[permission].description
+    : `${PERMISSIONS[permission].description} (You do not hold this permission.)`,
+  disabled: Boolean(blocker) || !actor.permissions.has(permission),
+}));
+---
+
+<StaffLayout
+  title={existing ? existing.name : 'New role'}
+  back={{ href: '/staff/roles', label: 'Roles' }}
+>
+  {blocker && <p class="notice notice--info staff-notice">{blocker}</p>}
+  <form method="post" class="form" novalidate>
+    <CsrfField />
+    <ErrorSummary
+      errors={errors}
+      labels={{ name: 'Name', description: 'Description', permissions: 'Permissions' }}
+    />
+    <fieldset class="card form role-fields" disabled={Boolean(blocker)}>
+      <legend class="visually-hidden">Role details</legend>
+      <Field
+        name="name"
+        label="Name"
+        value={values.name}
+        required
+        maxlength={40}
+        error={errors.name}
+      />
+      <Field
+        name="description"
+        label="Description"
+        value={values.description}
+        maxlength={200}
+        error={errors.description}
+      />
+      <Checkboxes
+        name="permissions"
+        legend="Permissions"
+        options={options}
+        values={values.permissions}
+        hint="“Access the staff panel” is required for any of the others to work."
+        error={errors.permissions}
+      />
+    </fieldset>
+    {!blocker && (
+      <div class="form-actions">
+        <button class="button button--primary" type="submit" name="intent" value="save">
+          {existing ? 'Save role' : 'Create role'}
+        </button>
+        <a class="button" href="/staff/roles">
+          Cancel
+        </a>
+      </div>
+    )}
+  </form>
+
+  {existing && !blocker && (
+    <section class="card card--danger delete-role" aria-labelledby="delete-title">
+      <h2 id="delete-title">Delete role</h2>
+      {existing.memberCount > 0 ? (
+        <p class="muted">
+          {existing.memberCount} staff{' '}
+          {existing.memberCount === 1 ? 'account uses' : 'accounts use'} this role. Move them to
+          another role before deleting it.
+        </p>
+      ) : (
+        <form method="post">
+          <CsrfField />
+          <input type="hidden" name="intent" value="delete" />
+          <button class="button button--danger" type="submit">
+            Delete role
+          </button>
+        </form>
+      )}
+    </section>
+  )}
+</StaffLayout>
+
+<style>
+  .role-fields {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .role-fields:disabled {
+    opacity: 0.8;
+  }
+
+  .delete-role {
+    margin-top: var(--space-6);
+    max-width: 48rem;
+  }
+
+  .delete-role .muted {
+    font-size: var(--text-sm);
+  }
+</style>

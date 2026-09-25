@@ -1,0 +1,87 @@
+---
+import Field from '../../components/staff/form/Field.astro';
+import StaffLayout from '../../layouts/StaffLayout.astro';
+import { sessionCookieName, sessionCookieOptions } from '../../server/auth/sessions.ts';
+import { getDb } from '../../server/db/client.ts';
+import { safeStaffRedirect } from '../../server/security/redirects.ts';
+import { login } from '../../server/services/auth.ts';
+import { field, submittedForm } from '../../server/staff/page.ts';
+
+// Already signed in: go straight to the requested page.
+const next = safeStaffRedirect(Astro.url.searchParams.get('next'));
+if (Astro.locals.actor && Astro.request.method === 'GET') return Astro.redirect(next);
+
+let error: string | null = null;
+let email = '';
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  email = field(form, 'email').slice(0, 254);
+  const result = await login(getDb(), {
+    email,
+    password: field(form, 'password'),
+    ip: Astro.locals.clientIp,
+    userAgent: Astro.request.headers.get('user-agent'),
+  });
+  if (result.ok) {
+    // A fresh token replaces any existing session cookie (no session fixation).
+    Astro.cookies.set(
+      sessionCookieName(),
+      result.session.token,
+      sessionCookieOptions(result.session.expiresAt),
+    );
+    return Astro.redirect(safeStaffRedirect(field(form, 'next') || next), 303);
+  }
+  if (result.reason === 'rate_limited') {
+    Astro.response.status = 429;
+    error = 'Too many sign-in attempts. Wait 15 minutes and try again.';
+  } else {
+    Astro.response.status = 401;
+    error = 'The email or password is incorrect.';
+  }
+}
+---
+
+<StaffLayout title="Sign in" chrome={false}>
+  {error && (
+    <div class="notice notice--danger staff-notice" role="alert">
+      {error}
+    </div>
+  )}
+  <form method="post" class="form card" novalidate>
+    <input type="hidden" name="next" value={next} />
+    <Field
+      name="email"
+      label="Email"
+      type="email"
+      value={email}
+      required
+      autocomplete="username"
+      maxlength={254}
+    />
+    <Field
+      name="password"
+      label="Password"
+      type="password"
+      required
+      autocomplete="current-password"
+      maxlength={256}
+    />
+    <div>
+      <button class="button button--primary" type="submit">
+        Sign in
+      </button>
+    </div>
+  </form>
+  <p class="login-help subtle">
+    Staff accounts are created by invitation only. If you have lost access, ask an administrator for
+    a password reset link.
+  </p>
+</StaffLayout>
+
+<style>
+  .login-help {
+    margin-top: var(--space-5);
+    font-size: var(--text-sm);
+  }
+</style>

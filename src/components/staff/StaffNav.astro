@@ -1,0 +1,70 @@
+---
+import { can, type Actor } from '../../server/auth/authorization.ts';
+import type { Permission } from '../../server/auth/permissions.ts';
+
+interface Props {
+  actor: Actor;
+  label: string;
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  permission: Permission;
+}
+
+const NAV: { heading: string; items: NavItem[] }[] = [
+  {
+    heading: 'Content',
+    items: [
+      { href: '/staff/products', label: 'Products', permission: 'products.manage' },
+      { href: '/staff/releases', label: 'Releases', permission: 'releases.manage' },
+      { href: '/staff/docs', label: 'Documentation', permission: 'docs.manage' },
+      { href: '/staff/services', label: 'Services', permission: 'content.manage' },
+      { href: '/staff/team', label: 'Team page', permission: 'team.manage' },
+      { href: '/staff/content', label: 'Site copy', permission: 'content.manage' },
+      { href: '/staff/media', label: 'Media', permission: 'media.manage' },
+    ],
+  },
+  {
+    heading: 'Administration',
+    items: [
+      { href: '/staff/users', label: 'Staff accounts', permission: 'staff.manage' },
+      { href: '/staff/roles', label: 'Roles', permission: 'roles.manage' },
+      { href: '/staff/settings', label: 'Site settings', permission: 'settings.manage' },
+      { href: '/staff/audit', label: 'Audit log', permission: 'audit.view' },
+    ],
+  },
+];
+
+const { actor, label } = Astro.props;
+const path = Astro.url.pathname;
+// Showing only permitted sections is a convenience; pages and services enforce access.
+const sections = NAV.map((section) => ({
+  ...section,
+  items: section.items.filter((item) => can(actor, item.permission)),
+})).filter((section) => section.items.length > 0);
+const current = (href: string) => path === href || path.startsWith(`${href}/`);
+---
+
+<nav class="staff-nav" aria-label={label}>
+  <a href="/staff" aria-current={path === '/staff' ? 'page' : undefined}>
+    Dashboard
+  </a>
+  {sections.map((section) => (
+    <div class="staff-nav__section">
+      <p class="staff-nav__heading">{section.heading}</p>
+      {section.items.map((item) => (
+        <a href={item.href} aria-current={current(item.href) ? 'page' : undefined}>
+          {item.label}
+        </a>
+      ))}
+    </div>
+  ))}
+  <div class="staff-nav__section">
+    <a href="/staff/account" aria-current={current('/staff/account') ? 'page' : undefined}>
+      Your account
+    </a>
+    <a href="/">View public site</a>
+  </div>
+</nav>

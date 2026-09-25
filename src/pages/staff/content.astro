@@ -1,0 +1,143 @@
+---
+import CsrfField from '../../components/staff/form/CsrfField.astro';
+import ErrorSummary from '../../components/staff/form/ErrorSummary.astro';
+import Field from '../../components/staff/form/Field.astro';
+import TextArea from '../../components/staff/form/TextArea.astro';
+import StaffLayout from '../../layouts/StaffLayout.astro';
+import { renderMarkdown, type SafeHtml } from '../../lib/markdown.ts';
+import { CONTENT_BLOCKS, type ContentKey } from '../../lib/site-registry.ts';
+import { getDb } from '../../server/db/client.ts';
+import {
+  customisedContentKeys,
+  getContent,
+  resetContentBlock,
+  updateContent,
+} from '../../server/services/site.ts';
+import {
+  field,
+  mutationContext,
+  requirePermission,
+  submittedForm,
+} from '../../server/staff/page.ts';
+
+requirePermission(Astro, 'content.manage');
+const db = getDb();
+const keys = Object.keys(CONTENT_BLOCKS) as ContentKey[];
+let values: Record<string, string> = getContent(db);
+let errors: Record<string, string> = {};
+const previews: Partial<Record<ContentKey, SafeHtml>> = {};
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  const intent = field(form, 'intent');
+  const ctx = mutationContext(Astro);
+  if (intent.startsWith('reset:')) {
+    resetContentBlock(db, ctx, intent.slice('reset:'.length));
+    return Astro.redirect('/staff/content?notice=saved', 303);
+  }
+  values = Object.fromEntries(keys.map((key) => [key, field(form, key)]));
+  if (intent === 'preview') {
+    for (const key of keys) {
+      if (CONTENT_BLOCKS[key].kind === 'markdown') {
+        previews[key] = renderMarkdown(values[key] ?? '', { baseLevel: 2 }).html;
+      }
+    }
+  } else {
+    const result = updateContent(db, ctx, values);
+    if (result.ok) return Astro.redirect('/staff/content?notice=saved', 303);
+    errors = result.errors;
+  }
+}
+
+const customised = customisedContentKeys(db);
+const labels = Object.fromEntries(keys.map((key) => [key, CONTENT_BLOCKS[key].label]));
+---
+
+<StaffLayout title="Site copy">
+  <p class="intro muted">
+    Editable text used across the public site. Blocks marked “default” use the built-in text until
+    you change them.
+  </p>
+  <form method="post" class="form" novalidate>
+    <CsrfField />
+    <button type="submit" name="intent" value="save" hidden tabindex="-1">
+      Save
+    </button>
+    <ErrorSummary errors={errors} labels={labels} />
+    {keys.map((key) => {
+      const definition = CONTENT_BLOCKS[key];
+      return (
+        <div class="card content-block">
+          <div class="content-block__meta">
+            <span class={`badge ${customised.has(key) ? 'badge--positive' : ''}`}>
+              {customised.has(key) ? 'customised' : 'default'}
+            </span>
+            <code class="subtle">{key}</code>
+            {customised.has(key) && (
+              <button
+                class="button button--small"
+                type="submit"
+                name="intent"
+                value={`reset:${key}`}
+              >
+                Reset to default
+              </button>
+            )}
+          </div>
+          {definition.kind === 'markdown' ? (
+            <TextArea
+              name={key}
+              label={definition.label}
+              value={values[key]}
+              rows={6}
+              maxlength={definition.maxLength}
+              markdown
+              preview={previews[key] ?? null}
+              hint={definition.description}
+              error={errors[key]}
+            />
+          ) : (
+            <Field
+              name={key}
+              label={definition.label}
+              value={values[key]}
+              maxlength={definition.maxLength}
+              required={key === 'home.hero.title'}
+              hint={definition.description}
+              error={errors[key]}
+            />
+          )}
+        </div>
+      );
+    })}
+    <div class="form-actions">
+      <button class="button button--primary" type="submit" name="intent" value="save">
+        Save all changes
+      </button>
+    </div>
+  </form>
+</StaffLayout>
+
+<style>
+  .intro {
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+  }
+
+  .content-block + .content-block {
+    margin-top: 0;
+  }
+
+  .content-block__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+    font-size: var(--text-xs);
+  }
+
+  .content-block__meta .button {
+    margin-left: auto;
+  }
+</style>

@@ -1,0 +1,22 @@
+---
+import ConfirmDelete from '../../../../components/staff/ConfirmDelete.astro';
+import StaffLayout from '../../../../layouts/StaffLayout.astro';
+import { getDb } from '../../../../server/db/client.ts';
+import { deleteOffering, getOfferingForStaff } from '../../../../server/services/offerings.ts';
+import { mutationContext, parseId, requirePermission } from '../../../../server/staff/page.ts';
+
+const actor = requirePermission(Astro, 'content.manage');
+const db = getDb();
+const id = parseId(Astro.params.id);
+if (id === null) return Astro.rewrite('/404');
+const offering = getOfferingForStaff(db, actor, id);
+
+if (Astro.request.method === 'POST') {
+  deleteOffering(db, mutationContext(Astro), id);
+  return Astro.redirect('/staff/services?notice=deleted', 303);
+}
+---
+
+<StaffLayout title="Delete service" back={{ href: `/staff/services/${id}`, label: offering.title }}>
+  <ConfirmDelete subject={offering.title} cancelHref={`/staff/services/${id}`} />
+</StaffLayout>

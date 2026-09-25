@@ -1,0 +1,52 @@
+---
+/*
+ * Rendered by Astro when a page throws. Deliberately does not use
+ * SiteLayout: the error may have come from the database, which SiteLayout
+ * queries for links and copy. Error details are never shown to visitors.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Wordmark from '../components/Wordmark.astro';
+
+Astro.response.status = 500;
+---
+
+<BaseLayout title="Something went wrong" noindex>
+  <main id="main-content" class="error-page">
+    <a href="/" class="error-page__brand">
+      <Wordmark />
+    </a>
+    <p class="eyebrow">Error 500</p>
+    <h1>Something went wrong</h1>
+    <p class="muted">The page could not be loaded. Please try again in a moment.</p>
+    <div class="button-row">
+      <a class="button button--primary" href="/">
+        Go to the homepage
+      </a>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .error-page {
+    width: 100%;
+    max-width: 40rem;
+    margin: auto;
+    padding: var(--space-8) var(--gutter);
+  }
+
+  .error-page__brand :global(img) {
+    width: 8rem;
+    height: auto;
+    margin-bottom: var(--space-7);
+  }
+
+  h1 {
+    margin-block: var(--space-3) var(--space-4);
+    font-size: var(--text-3xl);
+    font-weight: 800;
+  }
+
+  .button-row {
+    margin-top: var(--space-6);
+  }
+</style>

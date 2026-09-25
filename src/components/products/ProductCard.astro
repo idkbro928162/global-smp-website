@@ -1,0 +1,169 @@
+---
+import { platformLabel } from '../../lib/catalog.ts';
+import type { ProductListing } from '../../server/services/products.ts';
+import AvailabilityBadge from './AvailabilityBadge.astro';
+import ProductArtwork from './ProductArtwork.astro';
+
+interface Props {
+  product: ProductListing;
+  headingLevel?: 'h2' | 'h3';
+}
+
+const { product, headingLevel: Heading = 'h3' } = Astro.props;
+const platforms = product.platforms.slice(0, 3).map(platformLabel);
+const morePlatforms = product.platforms.length - platforms.length;
+---
+
+<article class:list={['product-card', `accent-${product.accent}`]}>
+  <ProductArtwork name={product.name} accent={product.accent} artwork={product.artwork} />
+  <div class="product-card__body">
+    <div class="product-card__meta">
+      <AvailabilityBadge availability={product.availability} />
+      {product.latestRelease && (
+        <span class="badge">
+          v{product.latestRelease.version}
+          {product.latestRelease.channel !== 'stable' && ` · ${product.latestRelease.channel}`}
+        </span>
+      )}
+    </div>
+    <Heading class="product-card__title">
+      <a href={`/products/${product.slug}`}>{product.name}</a>
+    </Heading>
+    {product.tagline && <p class="product-card__tagline">{product.tagline}</p>}
+    {(platforms.length > 0 || product.minecraftVersions.length > 0) && (
+      <dl class="product-card__specs">
+        {platforms.length > 0 && (
+          <div>
+            <dt>Platforms</dt>
+            <dd>
+              {platforms.join(', ')}
+              {morePlatforms > 0 && ` +${morePlatforms}`}
+            </dd>
+          </div>
+        )}
+        {product.minecraftVersions.length > 0 && (
+          <div>
+            <dt>Minecraft</dt>
+            <dd>
+              {product.minecraftVersions.slice(0, 3).join(', ')}
+              {product.minecraftVersions.length > 3 && ` +${product.minecraftVersions.length - 3}`}
+            </dd>
+          </div>
+        )}
+      </dl>
+    )}
+  </div>
+</article>
+
+<style>
+  .product-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    overflow: hidden;
+    transition:
+      border-color var(--duration) var(--ease),
+      transform var(--duration) var(--ease);
+  }
+
+  .product-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    z-index: 1;
+    background: var(--accent);
+  }
+
+  .product-card:hover,
+  .product-card:focus-within {
+    border-color: var(--color-border-strong);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .product-card:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  .product-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-5);
+    flex: 1;
+  }
+
+  .product-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .product-card__title {
+    font-size: var(--text-lg);
+    font-weight: 750;
+    line-height: 1.25;
+  }
+
+  .product-card__title a {
+    text-decoration: none;
+  }
+
+  /* The whole card is clickable via the title link's pseudo-element. */
+  .product-card__title a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+  }
+
+  .product-card__title a:focus-visible {
+    outline: none;
+  }
+
+  .product-card:has(.product-card__title a:focus-visible) {
+    outline: 2px solid var(--color-text);
+    outline-offset: 3px;
+  }
+
+  .product-card__tagline {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .product-card__specs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+    margin-top: auto;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-xs);
+  }
+
+  .product-card__specs div {
+    display: flex;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .product-card__specs dt {
+    flex: none;
+    width: 5.5rem;
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .product-card__specs dd {
+    min-width: 0;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+  }
+</style>

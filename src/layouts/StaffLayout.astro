@@ -1,0 +1,91 @@
+---
+/**
+ * Layout for the private staff area. Navigation only shows sections the
+ * actor may use — purely for convenience: every page and service enforces
+ * its own permission regardless of what the navigation shows.
+ */
+import '../styles/staff.css';
+import CsrfField from '../components/staff/form/CsrfField.astro';
+import StaffNav from '../components/staff/StaffNav.astro';
+import Icon from '../components/Icon.astro';
+import Wordmark from '../components/Wordmark.astro';
+import { noticeFor } from '../server/staff/page.ts';
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  title: string;
+  /** Breadcrumb-style parent link shown above the title. */
+  back?: { href: string; label: string };
+  /** Set false for pages rendered without a signed-in actor (sign-in, setup). */
+  chrome?: boolean;
+}
+
+const { title, back, chrome = true } = Astro.props;
+const actor = Astro.locals.actor;
+const notice = noticeFor(Astro.url);
+---
+
+<BaseLayout title={`${title} · Staff`} noindex>
+  <a class="skip-link" href="#main-content">
+    Skip to content
+  </a>
+  <div class:list={['staff', { 'staff--bare': !chrome || !actor }]}>
+    <header class="staff-topbar">
+      <a class="staff-topbar__brand" href={actor ? '/staff' : '/'}>
+        <Wordmark />
+        <span class="staff-topbar__label mono">Staff</span>
+      </a>
+      {chrome && actor && (
+        <div class="staff-topbar__user">
+          <a href="/staff/account" class="staff-topbar__account">
+            <span class="staff-topbar__name">{actor.displayName}</span>
+            <span class="staff-topbar__role mono">{actor.role.name}</span>
+          </a>
+          <form method="post" action="/staff/logout">
+            <CsrfField />
+            <button class="button button--small" type="submit">
+              Sign out
+            </button>
+          </form>
+        </div>
+      )}
+    </header>
+
+    {chrome && actor && (
+      <details class="staff-nav-disclosure" data-staff-nav>
+        <summary>
+          <Icon name="menu" size={16} /> Menu
+        </summary>
+        <StaffNav actor={actor} label="Staff (mobile)" />
+      </details>
+    )}
+
+    {chrome && actor && (
+      <aside class="staff-sidebar">
+        <StaffNav actor={actor} label="Staff" />
+      </aside>
+    )}
+
+    <main id="main-content" class="staff-main" tabindex="-1">
+      <div class="staff-page-header">
+        <div>
+          {back && (
+            <a class="staff-back" href={back.href}>
+              <Icon name="arrow-left" size={14} /> <span>{back.label}</span>
+            </a>
+          )}
+          <h1>{title}</h1>
+        </div>
+        <div class="staff-page-header__actions">
+          <slot name="actions" />
+        </div>
+      </div>
+      {notice && (
+        <div class="notice notice--success staff-notice" role="status">
+          {notice}
+        </div>
+      )}
+      <slot />
+    </main>
+  </div>
+</BaseLayout>

@@ -1,0 +1,89 @@
+---
+/**
+ * One-time account link: first-time setup for invited staff, or a password
+ * reset issued by an administrator. The token is single-use and expires.
+ */
+import Field from '../../../components/staff/form/Field.astro';
+import StaffLayout from '../../../layouts/StaffLayout.astro';
+import { PASSWORD_MIN_LENGTH } from '../../../server/auth/passwords.ts';
+import { getDb } from '../../../server/db/client.ts';
+import { completeAccountToken, inspectAccountToken } from '../../../server/services/auth.ts';
+import { field, submittedForm } from '../../../server/staff/page.ts';
+
+const db = getDb();
+const token = Astro.params.token ?? '';
+let errors: Record<string, string> = {};
+let blocked: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = submittedForm(Astro);
+  const result = await completeAccountToken(db, {
+    token,
+    password: field(form, 'password'),
+    confirm: field(form, 'confirm'),
+    ip: Astro.locals.clientIp,
+  });
+  if (result.ok) return Astro.redirect('/staff/login?notice=password-set', 303);
+  if (result.reason === 'invalid_input') errors = result.errors;
+  else if (result.reason === 'rate_limited') {
+    Astro.response.status = 429;
+    blocked = 'Too many attempts from your network. Wait 15 minutes and try again.';
+  }
+}
+
+const target = inspectAccountToken(db, token);
+if (!target && !blocked) Astro.response.status = 404;
+const isSetup = target?.purpose === 'setup';
+---
+
+<StaffLayout
+  title={!target ? 'Link not valid' : isSetup ? 'Set up your account' : 'Choose a new password'}
+  chrome={false}
+>
+  {blocked ? (
+    <div class="notice notice--danger" role="alert">
+      {blocked}
+    </div>
+  ) : !target ? (
+    <div class="notice notice--warning" role="alert">
+      <p>
+        This link is invalid, has expired or has already been used. Ask an administrator for a new
+        link.
+      </p>
+    </div>
+  ) : (
+    <form method="post" class="form card" novalidate>
+      <p class="muted">
+        {isSetup ? 'Welcome' : 'Hello'}, <strong>{target.displayName}</strong> ({target.email}).
+        {isSetup
+          ? ' Choose a password to activate your staff account.'
+          : ' Choose a new password. All existing sessions will be signed out.'}
+      </p>
+      <input type="text" name="username" value={target.email} autocomplete="username" hidden />
+      <Field
+        name="password"
+        label="New password"
+        type="password"
+        required
+        autocomplete="new-password"
+        maxlength={256}
+        hint={`At least ${PASSWORD_MIN_LENGTH} characters. A long passphrase is best.`}
+        error={errors.password}
+      />
+      <Field
+        name="confirm"
+        label="Confirm password"
+        type="password"
+        required
+        autocomplete="new-password"
+        maxlength={256}
+        error={errors.confirm}
+      />
+      <div>
+        <button class="button button--primary" type="submit">
+          {isSetup ? 'Activate account' : 'Set new password'}
+        </button>
+      </div>
+    </form>
+  )}
+</StaffLayout>

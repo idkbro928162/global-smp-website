@@ -1,0 +1,262 @@
+---
+import Icon from '../Icon.astro';
+import Wordmark from '../Wordmark.astro';
+
+interface Props {
+  storeUrl: string;
+}
+
+const { storeUrl } = Astro.props;
+const path = Astro.url.pathname;
+
+const NAV = [
+  { href: '/products', label: 'Products' },
+  { href: '/docs', label: 'Docs' },
+  { href: '/services', label: 'Services' },
+  { href: '/support', label: 'Support' },
+  { href: '/about', label: 'About' },
+];
+
+const isCurrent = (href: string) => path === href || path.startsWith(`${href}/`);
+---
+
+<header class="site-header" id="site-header">
+  <div class="container site-header__inner">
+    <a class="site-header__brand" href="/">
+      <Wordmark class="site-header__logo" />
+    </a>
+
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        {NAV.map((item) => (
+          <li>
+            <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      {storeUrl && (
+        <a class="button button--primary button--small" href={storeUrl}>
+          BuiltByBit store
+          <Icon name="external" size={14} class="button__icon" />
+          <span class="visually-hidden">(external site)</span>
+        </a>
+      )}
+    </div>
+
+    {/* Mobile menu: a native disclosure, so it works without JavaScript. */}
+    <details class="mobile-nav" data-mobile-nav>
+      <summary class="mobile-nav__toggle">
+        <Icon name="menu" size={18} class="mobile-nav__icon-open" />
+        <Icon name="close" size={18} class="mobile-nav__icon-close" />
+        <span>Menu</span>
+      </summary>
+      <div class="mobile-nav__panel">
+        <nav aria-label="Main (mobile)">
+          <ul>
+            {NAV.map((item) => (
+              <li>
+                <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+                  {item.label}
+                  <Icon name="chevron" size={16} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        {storeUrl && (
+          <a class="button button--primary mobile-nav__store" href={storeUrl}>
+            BuiltByBit store
+            <Icon name="external" size={14} class="button__icon" />
+            <span class="visually-hidden">(external site)</span>
+          </a>
+        )}
+      </div>
+    </details>
+  </div>
+</header>
+
+<script>
+  // Progressive enhancement for the mobile menu: close on Escape, on outside
+  // click and when the viewport grows past the mobile breakpoint.
+  const menu = document.querySelector<HTMLDetailsElement>('[data-mobile-nav]');
+  if (menu) {
+    const summary = menu.querySelector('summary');
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && menu.open) {
+        menu.open = false;
+        summary?.focus();
+      }
+    });
+    document.addEventListener('click', (event) => {
+      if (menu.open && event.target instanceof Node && !menu.contains(event.target)) {
+        menu.open = false;
+      }
+    });
+    window.matchMedia('(min-width: 56rem)').addEventListener('change', (event) => {
+      if (event.matches) menu.open = false;
+    });
+  }
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--color-bg) 94%, transparent);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  @supports (backdrop-filter: blur(1px)) {
+    .site-header {
+      background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+      backdrop-filter: blur(12px);
+    }
+  }
+
+  .site-header__inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    height: var(--header-height);
+  }
+
+  .site-header__brand {
+    display: block;
+    flex: none;
+    padding: var(--space-1) 0;
+  }
+
+  .site-header__brand :global(.site-header__logo) {
+    height: 2.125rem;
+    width: auto;
+  }
+
+  .site-nav {
+    display: none;
+  }
+
+  .site-nav ul {
+    display: flex;
+    gap: var(--space-1);
+    list-style: none;
+    padding: 0;
+  }
+
+  .site-nav a {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 550;
+    text-decoration: none;
+    transition: color var(--duration) var(--ease);
+  }
+
+  .site-nav a:hover,
+  .site-nav a[aria-current='page'] {
+    color: var(--color-text);
+  }
+
+  .site-nav a[aria-current='page'] {
+    box-shadow: inset 0 -2px 0 var(--color-text);
+    border-radius: 0;
+  }
+
+  .site-header__actions {
+    display: none;
+    margin-left: auto;
+  }
+
+  .mobile-nav {
+    margin-left: auto;
+  }
+
+  .mobile-nav__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 2.75rem;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .mobile-nav__toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  /* The icons are rendered by the Icon component, so they carry its style
+     scope, not this one: target them with :global(). */
+  .mobile-nav__toggle :global(.mobile-nav__icon-close),
+  .mobile-nav[open] .mobile-nav__toggle :global(.mobile-nav__icon-open) {
+    display: none;
+  }
+
+  .mobile-nav[open] .mobile-nav__toggle :global(.mobile-nav__icon-close) {
+    display: block;
+  }
+
+  .mobile-nav__panel {
+    position: absolute;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    max-height: calc(100dvh - var(--header-height));
+    overflow-y: auto;
+    padding: var(--space-3) var(--gutter) var(--space-6);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mobile-nav__panel ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .mobile-nav__panel li + li {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .mobile-nav__panel a:not(.button) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 3.25rem;
+    font-size: var(--text-lg);
+    font-weight: 650;
+    text-decoration: none;
+  }
+
+  .mobile-nav__panel a[aria-current='page'] {
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+
+  .mobile-nav__store {
+    width: 100%;
+    margin-top: var(--space-5);
+  }
+
+  @media (min-width: 56rem) {
+    .site-nav,
+    .site-header__actions {
+      display: block;
+    }
+
+    .mobile-nav {
+      display: none;
+    }
+  }
+</style>
